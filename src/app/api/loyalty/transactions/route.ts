@@ -1,0 +1,45 @@
+import { NextResponse } from 'next/server'
+import { getTransactionsCollection, getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
+
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')?.trim().toLowerCase()
+
+    if (!userId) {
+        return NextResponse.json({ success: false, error: 'userId is required.' }, { status: 400 })
+    }
+
+    try {
+        const transactionsCollection = await getTransactionsCollection()
+        const results = await transactionsCollection
+            .find({ userId })
+            .sort({ createdAt: -1 })
+            .toArray()
+
+        const restaurantIds = Array.from(new Set(results.map(t => t.restaurantId)))
+        const owners = await getRestaurantOwnersCollection()
+        const ownerDocs = restaurantIds.length > 0
+            ? await owners.find({ restaurantId: { $in: restaurantIds } }).toArray()
+            : []
+        const nameByRestaurantId = new Map(ownerDocs.map(o => [o.restaurantId, o.restaurantName || o.restaurantId]))
+
+        return NextResponse.json({
+            success: true,
+            transactions: results.map(t => ({
+                id: t._id.toString(),
+                restaurantId: t.restaurantId,
+                restaurantName: nameByRestaurantId.get(t.restaurantId) || t.restaurantId,
+                amount: t.amount,
+                discountAmount: t.discountAmount,
+                discountType: t.discountType,
+                discountValue: t.discountValue,
+                finalAmount: t.finalAmount,
+                freeItemName: t.freeItemName,
+                createdAt: t.createdAt,
+            })),
+        })
+    } catch (error) {
+        console.error('List transactions error:', error)
+        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+    }
+}

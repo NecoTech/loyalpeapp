@@ -134,16 +134,19 @@ function AdminAuthContent() {
 
                             <div className="flex items-center bg-[#f5f4ed] rounded-xl px-4 py-3 border-2 border-transparent focus-within:border-[#0d6683]">
                                 <MapPin size={18} className="text-[#70787d] mr-3 shrink-0" />
-                                <select
+                                <input
+                                    type="text"
+                                    list="admin-city-suggestions"
+                                    placeholder="City (shown to nearby customers)"
                                     value={city}
                                     onChange={(e) => setCity(e.target.value)}
-                                    className="bg-transparent flex-1 outline-none text-base text-[#1b1c18] appearance-none"
-                                >
-                                    <option value="">City (shown to nearby customers)</option>
+                                    className="bg-transparent flex-1 outline-none text-base placeholder:text-[#70787d]"
+                                />
+                                <datalist id="admin-city-suggestions">
                                     {CITIES.map(c => (
-                                        <option key={c.name} value={c.name}>{c.name}</option>
+                                        <option key={c.name} value={c.name} />
                                     ))}
-                                </select>
+                                </datalist>
                             </div>
                         </>
                     )}

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
 import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation } from 'lucide-react'
 import { useAdminAuth } from '../../context/AdminAuthContext'
-import { CITIES } from '../../context/LocationContext'
+import { KERALA_CITIES } from '../../../../lib/keralaCities'
 import { cn } from '../../../../lib/utils'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
@@ -1053,6 +1053,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
     const [phoneNumber, setPhoneNumber] = useState('')
     const [directionsUrl, setDirectionsUrl] = useState('')
     const [city, setCity] = useState('')
+    const [isCityListOpen, setIsCityListOpen] = useState(false)
 
     const fetchDetails = async () => {
         setIsLoading(true)
@@ -1117,6 +1118,12 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
 
     const hasDetails = address || phoneNumber || directionsUrl || city
 
+    const cityQuery = city.trim().toLowerCase()
+    const matchingKeralaCities = (cityQuery
+        ? KERALA_CITIES.filter(c => c.toLowerCase().includes(cityQuery))
+        : KERALA_CITIES
+    ).slice(0, 8)
+
     return (
         <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -1162,16 +1169,36 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                     <p className="text-xs text-[#70787d]">
                         Shown to customers on your restaurant&apos;s details page. City controls which customers see you when browsing restaurants by location.
                     </p>
-                    <select
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    >
-                        <option value="">Select city</option>
-                        {CITIES.map(c => (
-                            <option key={c.name} value={c.name}>{c.name}</option>
-                        ))}
-                    </select>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="City (e.g. Kochi)"
+                            value={city}
+                            onChange={(e) => { setCity(e.target.value); setIsCityListOpen(true) }}
+                            onFocus={() => setIsCityListOpen(true)}
+                            onBlur={() => setIsCityListOpen(false)}
+                            autoComplete="off"
+                            className="w-full bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
+                        />
+                        {isCityListOpen && matchingKeralaCities.length > 0 && (
+                            <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-white rounded-lg border border-[#e4e2dc] shadow-lg">
+                                {matchingKeralaCities.map(c => (
+                                    <button
+                                        key={c}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => { setCity(c); setIsCityListOpen(false) }}
+                                        className="w-full text-left px-4 py-2 text-sm hover:bg-[#f5f4ed] transition-colors"
+                                    >
+                                        {c}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-[11px] text-[#70787d] -mt-1.5">
+                        Search &amp; pick a city in Kerala, or type your own.
+                    </p>
                     <input
                         type="text"
                         placeholder="Address (e.g. 123 Ocean Front Walk, Santa Monica, CA)"

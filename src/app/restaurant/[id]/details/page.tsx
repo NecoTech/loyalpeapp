@@ -76,7 +76,16 @@ const CARD_THEMES = [
     { gradient: 'bg-gradient-to-br from-[#C4B5FD] via-[#A78BFA] to-[#7C3AED]', mutedText: 'text-violet-100' },
 ]
 
+function isCardCompleted(card: LoyaltyCard) {
+    return card.items.length > 0 && card.items.every(item => item.redeemed)
+}
+
 function LoyaltyCardsCarousel({ cards }: { cards: LoyaltyCard[] }) {
+    // Fully redeemed cards move to the back — the still-in-progress card(s)
+    // the customer actually needs stay up front. A stable sort keeps each
+    // group in its original (creation) order.
+    const orderedCards = [...cards].sort((a, b) => Number(isCardCompleted(a)) - Number(isCardCompleted(b)))
+
     return (
         <section className="pt-2">
             <div className="flex items-center justify-between mb-3 px-0.5">
@@ -88,7 +97,7 @@ function LoyaltyCardsCarousel({ cards }: { cards: LoyaltyCard[] }) {
                 )}
             </div>
             <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-5 px-5 snap-x snap-mandatory">
-                {cards.map((card, index) => {
+                {orderedCards.map((card, index) => {
                     const theme = CARD_THEMES[index % CARD_THEMES.length]
                     const unlockedCount = card.items.filter(i => i.redeemed).length
                     const totalCount = card.items.length

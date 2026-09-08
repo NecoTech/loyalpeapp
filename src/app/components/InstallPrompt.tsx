@@ -83,7 +83,7 @@ export default function InstallPrompt() {
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-zinc-800 shadow-lg z-50 border-t border-gray-200 dark:border-zinc-700">
             <div className="flex items-center justify-between">
                 <div className="flex-1">
-                    <h3 className="font-medium text-base">Install Oder App</h3>
+                    <h3 className="font-medium text-base">Install Loyalpe</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300">Add to home screen for a better experience!</p>
                 </div>
                 <div className="flex gap-2">

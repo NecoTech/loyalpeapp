@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
-import { ArrowLeft, Image as ImageIcon, Zap, ZapOff } from 'lucide-react'
+import { Hanken_Grotesk } from 'next/font/google'
+import { ArrowLeft } from 'lucide-react'
 import jsQR from 'jsqr'
 import { cn } from '../../../lib/utils'
 import { extractUpiVpa } from '../../../lib/upi'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '700', '800'] })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['600'] })
 
 type Status = 'requesting' | 'scanning' | 'resolving' | 'error'
 
@@ -29,13 +28,10 @@ export default function ScanPage() {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const streamRef = useRef<MediaStream | null>(null)
     const frameRef = useRef<number | null>(null)
-    const fileInputRef = useRef<HTMLInputElement>(null)
     const hasResolvedRef = useRef(false)
 
     const [status, setStatus] = useState<Status>('requesting')
     const [errorMessage, setErrorMessage] = useState('')
-    const [torchOn, setTorchOn] = useState(false)
-    const [torchSupported, setTorchSupported] = useState(false)
 
     const stopCamera = useCallback(() => {
         if (frameRef.current !== null) {
@@ -136,17 +132,13 @@ export default function ScanPage() {
                     await videoRef.current.play()
                 }
 
-                const [track] = stream.getVideoTracks()
-                const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
-                setTorchSupported(!!capabilities?.torch)
-
                 setStatus('scanning')
                 frameRef.current = requestAnimationFrame(scanFrame)
             } catch (err) {
                 console.error('Camera access failed', err)
                 if (!cancelled) {
                     setStatus('error')
-                    setErrorMessage('Camera access was denied or is unavailable. You can still pick a QR image from your gallery.')
+                    setErrorMessage('Camera access was denied or is unavailable. Please allow camera access and try again.')
                 }
             }
         }
@@ -159,47 +151,6 @@ export default function ScanPage() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-
-    const toggleTorch = async () => {
-        const [track] = streamRef.current?.getVideoTracks() || []
-        if (!track || !torchSupported) return
-        try {
-            await track.applyConstraints({ advanced: [{ torch: !torchOn } as MediaTrackConstraintSet] })
-            setTorchOn(prev => !prev)
-        } catch (err) {
-            console.error('Failed to toggle torch', err)
-        }
-    }
-
-    const handleGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        e.target.value = ''
-        if (!file) return
-
-        try {
-            const bitmap = await createImageBitmap(file)
-            const canvas = document.createElement('canvas')
-            canvas.width = bitmap.width
-            canvas.height = bitmap.height
-            const context = canvas.getContext('2d')
-            if (!context) return
-
-            context.drawImage(bitmap, 0, 0)
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-            const result = jsQR(imageData.data, imageData.width, imageData.height)
-
-            if (result?.data) {
-                handleDecoded(result.data)
-            } else {
-                setStatus('error')
-                setErrorMessage("Couldn't find a QR code in that image. Please try another one.")
-            }
-        } catch (err) {
-            console.error('Failed to read image', err)
-            setStatus('error')
-            setErrorMessage("Couldn't read that image. Please try another one.")
-        }
-    }
 
     return (
         <div className={cn(hankenGrotesk.className, "bg-[#30312c] h-[100dvh] w-full overflow-hidden relative text-white")}>
@@ -244,39 +195,6 @@ export default function ScanPage() {
                     {status === 'error' && errorMessage}
                 </p>
             </div>
-
-            {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 w-full px-6 pb-8 z-10">
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-4 flex justify-around items-center max-w-md mx-auto">
-                    <button
-                        onClick={toggleTorch}
-                        disabled={!torchSupported}
-                        className="flex flex-col items-center gap-2 group disabled:opacity-40"
-                    >
-                        <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors group-hover:scale-105 transform duration-200">
-                            {torchOn ? <ZapOff size={26} /> : <Zap size={26} />}
-                        </div>
-                        <span className={cn(jetbrainsMono.className, "text-xs text-white/90")}>Flash</span>
-                    </button>
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex flex-col items-center gap-2 group"
-                    >
-                        <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors group-hover:scale-105 transform duration-200">
-                            <ImageIcon size={26} />
-                        </div>
-                        <span className={cn(jetbrainsMono.className, "text-xs text-white/90")}>Gallery</span>
-                    </button>
-                </div>
-            </div>
-
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleGalleryFile}
-                className="hidden"
-            />
 
             <style jsx global>{`
                 .scan-laser {

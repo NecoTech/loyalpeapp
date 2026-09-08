@@ -1,6 +1,6 @@
 {
-    "name": "Oder App",
-    "short_name": "Oder",
+    "name": "Loyalpe",
+    "short_name": "Loyalpe",
     "description": "Order food online from your favorite restaurants",
     "start_url": "/",
     "display": "standalone",

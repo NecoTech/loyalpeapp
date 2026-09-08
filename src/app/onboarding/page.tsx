@@ -7,14 +7,16 @@ import {
     ArrowLeft,
     ArrowRight,
     Navigation,
+    MapPin,
     X,
     Search,
     ChevronRight,
     CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useLocation, CITIES } from '../context/LocationContext'
+import { useLocation, useCityCounts, CITIES } from '../context/LocationContext'
 import { hasSeenOnboarding, markOnboardingSeen } from '../../../lib/onboarding'
+import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
 
 const fredoka = Fredoka({ subsets: ['latin'], weight: ['600', '700'] })
@@ -134,6 +136,7 @@ export default function OnboardingPage() {
     const router = useRouter()
     const { user, isInitialized } = useAuth()
     const { setSelectedCity } = useLocation()
+    const cityCounts = useCityCounts()
 
     const [allowed, setAllowed] = useState(false)
     const [currentSlide, setCurrentSlide] = useState(0)
@@ -213,11 +216,17 @@ export default function OnboardingPage() {
         if (isCityModalVisible) searchInputRef.current?.focus()
     }, [isCityModalVisible])
 
+    const trimmedCitySearch = citySearch.trim()
     const filteredCities = CITIES.filter(city => {
-        const query = citySearch.trim().toLowerCase()
+        const query = trimmedCitySearch.toLowerCase()
         if (!query) return true
         return city.name.toLowerCase().includes(query) || city.region.toLowerCase().includes(query)
     })
+    // Typed something that isn't already one of the popular cities — offer
+    // to use it directly instead of dead-ending on "no cities found".
+    const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
+    const showCustomCityOption = normalizedCustomCity.length >= 2
+        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     if (!allowed) {
         return <div className="min-h-screen" style={{ backgroundColor: SLIDE_BG[0] }} />
@@ -429,16 +438,41 @@ export default function OnboardingPage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className={cn(fredoka.className, "px-2 py-0.5 bg-[#FFE066] border border-black rounded-md font-bold text-[11px] text-black")}>
-                                                {city.count}+ deals
+                                                {cityCounts[city.name] ?? 0} deals
                                             </span>
                                             <ChevronRight size={18} className="text-neutral-400" />
                                         </div>
                                     </button>
                                 )
                             })}
-                            {filteredCities.length === 0 && (
+                            {showCustomCityOption && (
+                                <button
+                                    type="button"
+                                    onClick={() => selectCity(normalizedCustomCity)}
+                                    className="w-full text-left p-3 rounded-xl border-2 border-dashed border-black shadow-[0_2px_0_0_#000] active:translate-y-0.5 flex items-center justify-between transition-all cursor-pointer bg-white hover:bg-yellow-50"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg border border-black bg-[#FFE066] flex items-center justify-center">
+                                            <MapPin size={16} className="text-black" />
+                                        </div>
+                                        <div>
+                                            <div className={cn(fredoka.className, "font-bold text-base leading-tight text-black")}>
+                                                Use &quot;{normalizedCustomCity}&quot;
+                                            </div>
+                                            <div className="text-[11px] font-semibold text-neutral-500">Search any city</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn(fredoka.className, "px-2 py-0.5 bg-[#FFE066] border border-black rounded-md font-bold text-[11px] text-black")}>
+                                            {cityCounts[normalizedCustomCity] ?? 0} deals
+                                        </span>
+                                        <ChevronRight size={18} className="text-neutral-400" />
+                                    </div>
+                                </button>
+                            )}
+                            {filteredCities.length === 0 && !showCustomCityOption && (
                                 <div className="py-6 text-center">
-                                    <p className="text-xs font-bold text-neutral-500">No cities found matching your search</p>
+                                    <p className="text-xs font-bold text-neutral-500">Search for any city to get started</p>
                                 </div>
                             )}
                         </div>

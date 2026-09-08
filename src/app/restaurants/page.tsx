@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { ArrowLeft, Search, Store, X } from 'lucide-react'
-import { useLocation, CITIES } from '../context/LocationContext'
+import { ArrowLeft, MapPin, Search, Store, X } from 'lucide-react'
+import { useLocation, useCityCounts, CITIES } from '../context/LocationContext'
+import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '700', '800'] })
@@ -55,6 +56,7 @@ const CATEGORY_CHIPS = [
 export default function RestaurantsPage() {
     const router = useRouter()
     const { selectedCity, setSelectedCity } = useLocation()
+    const cityCounts = useCityCounts()
 
     const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -124,9 +126,15 @@ export default function RestaurantsPage() {
         if (isCitySheetVisible) searchInputRef.current?.focus()
     }, [isCitySheetVisible])
 
+    const trimmedCitySearch = citySearch.trim()
     const filteredCities = CITIES.filter(city =>
-        city.name.toLowerCase().includes(citySearch.trim().toLowerCase())
+        city.name.toLowerCase().includes(trimmedCitySearch.toLowerCase())
     )
+    // Typed something that isn't already one of the popular cities — offer
+    // to use it directly instead of dead-ending on "no cities found".
+    const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
+    const showCustomCityOption = normalizedCustomCity.length >= 2
+        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     return (
         <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#FBF7EE] text-[#121212] flex justify-center selection:bg-[#FFBE18] selection:text-black")}>
@@ -314,14 +322,34 @@ export default function RestaurantsPage() {
                                                         <span className="w-2 h-2 rounded-full bg-[#C5F646] border border-[#121212] inline-block" />
                                                     )}
                                                 </div>
+                                                <div className="text-[10px] font-bold text-zinc-500 truncate">
+                                                    {isActive ? 'Active City' : `${cityCounts[city.name] ?? 0} restaurant${(cityCounts[city.name] ?? 0) === 1 ? '' : 's'}`}
+                                                </div>
                                             </div>
                                         </button>
                                     )
                                 })}
                             </div>
-                            {filteredCities.length === 0 && (
+                            {showCustomCityOption && (
+                                <button
+                                    type="button"
+                                    onClick={() => selectCity(normalizedCustomCity)}
+                                    className="w-full bg-white hover:bg-zinc-50 border-2 border-dashed border-[#121212] rounded-xl p-2.5 flex items-center gap-2.5 brutal-shadow-sm brutal-press transition-all text-left cursor-pointer"
+                                >
+                                    <span className="w-8 h-8 rounded-lg border-2 border-[#121212] bg-[#FFBE18] flex items-center justify-center shrink-0">
+                                        <MapPin size={16} className="text-[#121212]" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-black text-[#121212] truncate">Use &quot;{normalizedCustomCity}&quot;</div>
+                                        <div className="text-[10px] font-bold text-zinc-500 truncate">
+                                            {cityCounts[normalizedCustomCity] ?? 0} restaurant{(cityCounts[normalizedCustomCity] ?? 0) === 1 ? '' : 's'}
+                                        </div>
+                                    </div>
+                                </button>
+                            )}
+                            {filteredCities.length === 0 && !showCustomCityOption && (
                                 <div className="py-6 text-center">
-                                    <p className="text-xs font-black text-zinc-500">No cities found matching your search</p>
+                                    <p className="text-xs font-black text-zinc-500">Search for any city to get started</p>
                                 </div>
                             )}
                         </div>

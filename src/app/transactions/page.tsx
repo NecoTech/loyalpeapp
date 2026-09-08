@@ -241,7 +241,9 @@ export default function TransactionsPage() {
                                 {group.items.map(transaction => {
                                     const visual = getMerchantVisual(transaction.restaurantName)
                                     const Icon = visual.Icon
-                                    const time = new Date(transaction.createdAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+                                    const transactionDate = new Date(transaction.createdAt)
+                                    const dateLabel = transactionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                                    const time = transactionDate.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
                                     const maskedId = `••${transaction.id.slice(-4).toUpperCase()}`
 
                                     return (
@@ -269,19 +271,20 @@ export default function TransactionsPage() {
                                                 </div>
                                                 <div className="text-right shrink-0">
                                                     {transaction.freeItemName ? (
-                                                        <span className="inline-block px-2 py-0.5 bg-[#c084fc] text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge">
+                                                        <span className="inline-block px-2 py-0.5 bg-[#c084fc] text-[#111111] text-[11px] leading-[14px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge mb-1">
                                                             {transaction.freeItemName}
                                                         </span>
                                                     ) : transaction.discountAmount > 0 ? (
-                                                        <span className="inline-block px-2 py-0.5 bg-[#a3e635] text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge">
-                                                            -{formatCurrency(transaction.discountAmount)}
+                                                        <span className="inline-block px-2 py-0.5 bg-[#a3e635] text-[#111111] text-[11px] leading-[14px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge mb-1">
+                                                            -{formatCurrency(transaction.discountAmount)} saved
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-[17px] leading-[22px] tracking-[-0.01em] font-extrabold text-[#111111]">
-                                                            -{formatCurrency(transaction.finalAmount)}
-                                                        </span>
-                                                    )}
-                                                    <p className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold text-[#434656] mt-1">{time}</p>
+                                                    ) : null}
+                                                    <p className="text-[17px] leading-[22px] tracking-[-0.01em] font-extrabold text-[#111111]">
+                                                        -{formatCurrency(transaction.finalAmount)}
+                                                    </p>
+                                                    <p className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold text-[#434656] mt-1">
+                                                        {dateLabel} • {time}
+                                                    </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between pt-2 border-t border-dashed border-[#c4c5d9] text-[11px] leading-[14px] tracking-[0.04em] font-extrabold mt-2.5">

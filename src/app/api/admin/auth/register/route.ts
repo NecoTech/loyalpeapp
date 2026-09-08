@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getRestaurantOwnersCollection } from '../../../../../../lib/mongodb'
-import { CITY_NAMES } from '../../../../../../lib/cities'
+import { isValidCityName, normalizeCityName } from '../../../../../../lib/cities'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -17,7 +17,8 @@ export async function POST(request: Request) {
     const password = body.password
     const restaurantName = body.restaurantName?.trim()
     const restaurantId = body.restaurantId?.trim().toLowerCase()
-    const city = body.city?.trim()
+    const rawCity = body.city?.trim()
+    const city = rawCity ? normalizeCityName(rawCity) : undefined
 
     if (!email || !EMAIL_REGEX.test(email)) {
         return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
@@ -28,8 +29,8 @@ export async function POST(request: Request) {
     if (!restaurantName) {
         return NextResponse.json({ success: false, error: 'Restaurant name is required.' }, { status: 400 })
     }
-    if (city && !CITY_NAMES.includes(city as any)) {
-        return NextResponse.json({ success: false, error: 'Please select a valid city.' }, { status: 400 })
+    if (city && !isValidCityName(city)) {
+        return NextResponse.json({ success: false, error: 'Enter a valid city name.' }, { status: 400 })
     }
 
     try {

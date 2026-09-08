@@ -16,8 +16,9 @@ import {
     User,
 } from 'lucide-react'
 import { useAuth } from './context/AuthContext'
-import { useLocation, CITIES } from './context/LocationContext'
+import { useLocation, useCityCounts, CITIES } from './context/LocationContext'
 import { hasSeenOnboarding } from '../../lib/onboarding'
+import { normalizeCityName } from '../../lib/cities'
 import { cn } from '../../lib/utils'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
@@ -40,6 +41,7 @@ export default function Home() {
     const router = useRouter()
     const { user, isInitialized } = useAuth()
     const { selectedCity, setSelectedCity } = useLocation()
+    const cityCounts = useCityCounts()
     const [totalSaved, setTotalSaved] = useState(0)
     const [readyToRender, setReadyToRender] = useState(false)
 
@@ -115,9 +117,15 @@ export default function Home() {
         if (isCitySheetVisible) searchInputRef.current?.focus()
     }, [isCitySheetVisible])
 
+    const trimmedCitySearch = citySearch.trim()
     const filteredCities = CITIES.filter(city =>
-        city.name.toLowerCase().includes(citySearch.trim().toLowerCase())
+        city.name.toLowerCase().includes(trimmedCitySearch.toLowerCase())
     )
+    // Typed something that isn't already one of the popular cities — offer
+    // to use it directly instead of dead-ending on "no cities found".
+    const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
+    const showCustomCityOption = normalizedCustomCity.length >= 2
+        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     if (!readyToRender) {
         return <div className="min-h-screen bg-[#FAF7F0]" />
@@ -341,16 +349,33 @@ export default function Home() {
                                                     )}
                                                 </div>
                                                 <div className="text-[10px] font-bold text-[#434656] truncate">
-                                                    {isActive ? 'Active City' : `${city.count}+ Spots`}
+                                                    {isActive ? 'Active City' : `${cityCounts[city.name] ?? 0} restaurant${(cityCounts[city.name] ?? 0) === 1 ? '' : 's'}`}
                                                 </div>
                                             </div>
                                         </button>
                                     )
                                 })}
                             </div>
-                            {filteredCities.length === 0 && (
+                            {showCustomCityOption && (
+                                <button
+                                    type="button"
+                                    onClick={() => selectCity(normalizedCustomCity)}
+                                    className="w-full bg-white hover:bg-zinc-50 border-2 border-dashed border-[#111111] rounded-xl p-2.5 flex items-center gap-2.5 neo-shadow-badge active:translate-x-0.5 active:translate-y-0.5 transition-all text-left cursor-pointer"
+                                >
+                                    <span className="w-8 h-8 rounded-lg border-2 border-[#111111] bg-[#f6bf22] flex items-center justify-center shrink-0">
+                                        <MapPin size={16} className="text-[#111111]" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-black text-[#111111] truncate">Use &quot;{normalizedCustomCity}&quot;</div>
+                                        <div className="text-[10px] font-bold text-[#434656] truncate">
+                                            {cityCounts[normalizedCustomCity] ?? 0} restaurant{(cityCounts[normalizedCustomCity] ?? 0) === 1 ? '' : 's'}
+                                        </div>
+                                    </div>
+                                </button>
+                            )}
+                            {filteredCities.length === 0 && !showCustomCityOption && (
                                 <div className="py-6 text-center">
-                                    <p className="text-xs font-black text-[#434656]">No cities found matching your search</p>
+                                    <p className="text-xs font-black text-[#434656]">Search for any city to get started</p>
                                 </div>
                             )}
                         </div>

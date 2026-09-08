@@ -74,6 +74,13 @@ export type PaymentIntentDocument = {
     updatedAt: Date
 }
 
+export type PasswordResetDocument = {
+    userId: string // the account's email
+    tokenHash: string
+    expiresAt: Date
+    createdAt: Date
+}
+
 export type TransactionDocument = {
     userId: string
     restaurantId: string
@@ -194,6 +201,23 @@ export async function getTransactionsCollection(): Promise<Collection<Transactio
         await collection.createIndex({ userId: 1, restaurantId: 1 })
         await collection.createIndex({ orderId: 1 }, { unique: true, sparse: true })
         transactionsIndexEnsured = true
+    }
+
+    return collection
+}
+
+let passwordResetsIndexEnsured = false
+
+export async function getPasswordResetsCollection(): Promise<Collection<PasswordResetDocument>> {
+    const db = await getDb()
+    const collection = db.collection<PasswordResetDocument>('passwordResets')
+
+    if (!passwordResetsIndexEnsured) {
+        await collection.createIndex({ tokenHash: 1 }, { unique: true })
+        // TTL index — Mongo automatically deletes a reset doc once its
+        // expiresAt time has passed, so stale/used tokens don't pile up.
+        await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+        passwordResetsIndexEnsured = true
     }
 
     return collection

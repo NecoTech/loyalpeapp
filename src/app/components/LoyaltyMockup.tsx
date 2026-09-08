@@ -77,6 +77,17 @@ function formatResultTime(date: Date) {
     return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
 }
 
+function isCardCompleted(card: LoyaltyCard) {
+    return card.items.length > 0 && card.items.every(item => item.redeemed)
+}
+
+// Fully redeemed cards move to the back of the list — the still-in-progress
+// card(s) the customer actually needs stay up front. A stable sort keeps
+// each group in its original (creation) order.
+function orderCardsForDisplay(cards: LoyaltyCard[]) {
+    return [...cards].sort((a, b) => Number(isCardCompleted(a)) - Number(isCardCompleted(b)))
+}
+
 function ordinal(n: number) {
     const v = n % 100
     if (v >= 11 && v <= 13) return 'th'
@@ -220,6 +231,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     }, [restaurantId, user?.email, user?.phoneNumber])
 
     const activeCard = allCards.find(c => c.id === loyaltyCardId) || null
+    const orderedCards = orderCardsForDisplay(allCards)
     const successCardIndex = allCards.findIndex(c => c.id === successCardId)
     const successCard = successCardIndex >= 0 ? allCards[successCardIndex] : null
     const successTheme = successCard ? CARD_THEMES[successCardIndex % CARD_THEMES.length] : null
@@ -794,7 +806,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                                 <>
                                     <div className="relative">
                                         <div ref={drawerCarouselRef} className="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-2 pt-1 px-1">
-                                            {allCards.map((card, index) => {
+                                            {orderedCards.map((card, index) => {
                                                 const theme = CARD_THEMES[index % CARD_THEMES.length]
                                                 const unlockedCount = card.items.filter(i => i.redeemed).length
                                                 const totalCount = card.items.length
@@ -859,7 +871,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
                                     {allCards.length > 1 && (
                                         <div className="flex justify-center items-center gap-1.5 pt-1">
-                                            {allCards.map((card, index) => (
+                                            {orderedCards.map((card, index) => (
                                                 <button
                                                     key={card.id}
                                                     aria-label={`Card ${index + 1}`}

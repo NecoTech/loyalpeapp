@@ -130,7 +130,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         if (isInitialized && !user) {
-            router.replace(`/auth?redirect=${encodeURIComponent('/profile')}`)
+            router.replace(`/auth?redirect=${encodeURIComponent('/')}`)
         }
     }, [isInitialized, user, router])
 

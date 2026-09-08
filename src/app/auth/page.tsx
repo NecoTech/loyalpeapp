@@ -182,8 +182,35 @@ function AuthContent() {
         setTimeout(() => router.push(redirectTo), 800)
     }
 
-    const handleForgotPassword = () => {
-        showToast('COMING SOON', "Password reset isn't available yet.")
+    const [isRequestingReset, setIsRequestingReset] = useState(false)
+
+    const handleForgotPassword = async () => {
+        if (isRequestingReset) return
+
+        if (!loginEmail.trim()) {
+            showToast('ENTER YOUR EMAIL', 'Type your email above first, then tap Forgot Password.')
+            return
+        }
+
+        setIsRequestingReset(true)
+        try {
+            const res = await fetch('/api/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: loginEmail.trim() }),
+            })
+            const data = await res.json()
+            if (data.success) {
+                showToast('CHECK YOUR EMAIL', "If that email has an account, we've sent a reset link.")
+            } else {
+                showToast('SOMETHING WENT WRONG', data.error || 'Please try again.')
+            }
+        } catch (err) {
+            console.error('Forgot password request failed', err)
+            showToast('SOMETHING WENT WRONG', 'Please check your connection and try again.')
+        } finally {
+            setIsRequestingReset(false)
+        }
     }
 
     if (!isInitialized || user) {

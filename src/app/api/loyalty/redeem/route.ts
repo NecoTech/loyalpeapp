@@ -8,6 +8,7 @@ export async function POST(request: Request) {
         cardId?: string
         itemId?: string
         amount?: number
+        orderId?: string
     }
     try {
         body = await request.json()
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
             cardId: body.cardId,
             itemId: body.itemId,
             amount,
+            orderId: body.orderId?.trim() || undefined,
         })
 
         if (!result.success) {

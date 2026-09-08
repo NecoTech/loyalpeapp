@@ -119,6 +119,11 @@ export type RedeemLoyaltyParams = {
     cardId?: string
     itemId?: string
     amount: number
+    // Payment gateway order reference, when this redemption is finalizing an
+    // online payment. Lets a duplicate confirmation of the same payment
+    // (e.g. the client checking status twice) return the original result
+    // instead of recording — or redeeming — it a second time.
+    orderId?: string
 }
 
 export type RedeemLoyaltyTransaction = {
@@ -147,10 +152,35 @@ export type RedeemLoyaltyResult =
  * handler, so both finalize payments through the exact same logic.
  */
 export async function redeemLoyaltyReward(params: RedeemLoyaltyParams): Promise<RedeemLoyaltyResult> {
-    const { userId, restaurantId, amount } = params
+    const { userId, restaurantId, amount, orderId } = params
 
     if (!Number.isFinite(amount) || amount < 0) {
         return { success: false, error: 'Enter a valid amount.', status: 400 }
+    }
+
+    const transactions = await getTransactionsCollection()
+
+    // Already recorded this exact payment (a retried status check, a second
+    // tab, etc.) — return the original result rather than redeeming or
+    // inserting again.
+    if (orderId) {
+        const existing = await transactions.findOne({ orderId })
+        if (existing) {
+            const next = await getActiveCardReward(restaurantId, userId)
+            return {
+                success: true,
+                transaction: {
+                    amount: existing.amount,
+                    discountAmount: existing.discountAmount,
+                    discountType: existing.discountType,
+                    discountValue: existing.discountValue,
+                    finalAmount: existing.finalAmount,
+                    freeItemName: existing.freeItemName,
+                },
+                nextCard: next.card,
+                nextActiveItem: next.activeItem,
+            }
+        }
     }
 
     let discountAmount = 0
@@ -214,20 +244,45 @@ export async function redeemLoyaltyReward(params: RedeemLoyaltyParams): Promise<
         nextActiveItem = next.activeItem
     }
 
-    const transactions = await getTransactionsCollection()
-    await transactions.insertOne({
-        userId,
-        restaurantId,
-        cardId: resolvedCardId,
-        itemId: resolvedItemId,
-        amount,
-        discountAmount,
-        discountType,
-        discountValue,
-        finalAmount,
-        freeItemName,
-        createdAt: new Date(),
-    })
+    try {
+        await transactions.insertOne({
+            userId,
+            restaurantId,
+            cardId: resolvedCardId,
+            itemId: resolvedItemId,
+            amount,
+            discountAmount,
+            discountType,
+            discountValue,
+            finalAmount,
+            freeItemName,
+            orderId,
+            createdAt: new Date(),
+        })
+    } catch (error: any) {
+        // Two requests for the same payment both passed the findOne check
+        // above before either had inserted — the unique index on orderId
+        // caught it here instead. Treat it the same as the early return.
+        if (error?.code === 11000 && orderId) {
+            const existing = await transactions.findOne({ orderId })
+            if (existing) {
+                return {
+                    success: true,
+                    transaction: {
+                        amount: existing.amount,
+                        discountAmount: existing.discountAmount,
+                        discountType: existing.discountType,
+                        discountValue: existing.discountValue,
+                        finalAmount: existing.finalAmount,
+                        freeItemName: existing.freeItemName,
+                    },
+                    nextCard,
+                    nextActiveItem,
+                }
+            }
+        }
+        throw error
+    }
 
     return {
         success: true,

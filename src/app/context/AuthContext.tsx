@@ -15,11 +15,14 @@ type AuthResult = { success: true } | { success: false; error: string }
 
 type AuthContextType = {
   user: User | null
+  isInitialized: boolean
   login: (user: User) => void
   logout: () => void
   register: (user: User) => void
-  signUp: (email: string, password: string, fullname?: string) => Promise<AuthResult>
+  signUp: (email: string, password: string, fullname?: string, phoneNumber?: string) => Promise<AuthResult>
   signIn: (email: string, password: string) => Promise<AuthResult>
+  updateProfile: (updates: { fullname?: string; phoneNumber?: string; newPassword?: string }) => Promise<AuthResult>
+  deleteAccount: () => Promise<AuthResult>
 }
 
 const AUTH_STORAGE_KEY = 'authData' // Using a less obvious key name
@@ -28,6 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     // Check if user is stored in localStorage on initial load
@@ -44,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(AUTH_STORAGE_KEY)
       }
     }
+    setIsInitialized(true)
   }, [])
 
   const login = (userData: User) => {
@@ -81,12 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login(userData)
   }
 
-  const signUp = async (email: string, password: string, fullname?: string): Promise<AuthResult> => {
+  const signUp = async (email: string, password: string, fullname?: string, phoneNumber?: string): Promise<AuthResult> => {
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullname }),
+        body: JSON.stringify({ email, password, fullname, phoneNumber }),
       })
       const data = await res.json()
 
@@ -123,8 +128,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateProfile = async (updates: { fullname?: string; phoneNumber?: string; newPassword?: string }): Promise<AuthResult> => {
+    if (!user?.email) {
+      return { success: false, error: 'Not signed in.' }
+    }
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, ...updates }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Failed to update profile.' }
+      }
+
+      login(data.user as User)
+      return { success: true }
+    } catch (error) {
+      console.error('Update profile error:', error)
+      return { success: false, error: 'Network error. Please try again.' }
+    }
+  }
+
+  const deleteAccount = async (): Promise<AuthResult> => {
+    if (!user?.email) {
+      return { success: false, error: 'Not signed in.' }
+    }
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Failed to delete account.' }
+      }
+
+      logout()
+      return { success: true }
+    } catch (error) {
+      console.error('Delete account error:', error)
+      return { success: false, error: 'Network error. Please try again.' }
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, register, signUp, signIn }}>
+    <AuthContext.Provider value={{ user, isInitialized, login, logout, register, signUp, signIn, updateProfile, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   )

@@ -7,6 +7,7 @@ type Owner = {
   email: string
   restaurantName: string
   restaurantId?: string | null
+  city?: string | null
 }
 
 type AuthResult = { success: true } | { success: false; error: string }
@@ -15,7 +16,7 @@ type AdminAuthContextType = {
   owner: Owner | null
   isLoading: boolean
   logout: () => void
-  signUp: (email: string, password: string, restaurantName: string, restaurantId?: string) => Promise<AuthResult>
+  signUp: (email: string, password: string, restaurantName: string, restaurantId?: string, city?: string) => Promise<AuthResult>
   signIn: (email: string, password: string) => Promise<AuthResult>
 }
 
@@ -54,12 +55,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY)
   }
 
-  const signUp = async (email: string, password: string, restaurantName: string, restaurantId?: string): Promise<AuthResult> => {
+  const signUp = async (email: string, password: string, restaurantName: string, restaurantId?: string, city?: string): Promise<AuthResult> => {
     try {
       const res = await fetch('/api/admin/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, restaurantName, restaurantId }),
+        body: JSON.stringify({ email, password, restaurantName, restaurantId, city }),
       })
       const data = await res.json()
 

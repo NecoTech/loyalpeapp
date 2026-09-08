@@ -11,10 +11,31 @@ export async function GET(request: Request) {
 
     try {
         const transactionsCollection = await getTransactionsCollection()
-        const results = await transactionsCollection
+        const rawResults = await transactionsCollection
             .find({ userId })
             .sort({ createdAt: -1 })
             .toArray()
+
+        // Collapse near-duplicate transactions — same restaurant, amounts,
+        // and reward, recorded within a few seconds of each other. These
+        // could only come from the same payment being confirmed more than
+        // once (a client-side race, now fixed at the source); this just
+        // keeps any already-recorded duplicates from double-listing here.
+        const DEDUPE_WINDOW_MS = 30_000
+        const results: typeof rawResults = []
+        for (const t of rawResults) {
+            const isDuplicate = results.some(kept =>
+                kept.restaurantId === t.restaurantId &&
+                kept.amount === t.amount &&
+                kept.finalAmount === t.finalAmount &&
+                kept.discountAmount === t.discountAmount &&
+                (kept.freeItemName || '') === (t.freeItemName || '') &&
+                String(kept.cardId || '') === String(t.cardId || '') &&
+                String(kept.itemId || '') === String(t.itemId || '') &&
+                Math.abs(kept.createdAt.getTime() - t.createdAt.getTime()) <= DEDUPE_WINDOW_MS
+            )
+            if (!isDuplicate) results.push(t)
+        }
 
         const restaurantIds = Array.from(new Set(results.map(t => t.restaurantId)))
         const owners = await getRestaurantOwnersCollection()

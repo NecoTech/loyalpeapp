@@ -3,8 +3,9 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Hanken_Grotesk } from 'next/font/google'
-import { Mail, Lock, Store, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { Mail, Lock, Store, Eye, EyeOff, ShieldCheck, MapPin } from 'lucide-react'
 import { useAdminAuth } from '../context/AdminAuthContext'
+import { CITIES } from '../context/LocationContext'
 import { cn } from '../../../lib/utils'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
@@ -21,6 +22,7 @@ function AdminAuthContent() {
 
     const [restaurantName, setRestaurantName] = useState('')
     const [restaurantId, setRestaurantId] = useState('')
+    const [city, setCity] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -52,7 +54,7 @@ function AdminAuthContent() {
         setIsSubmitting(true)
         const result = mode === 'signin'
             ? await signIn(email, password)
-            : await signUp(email, password, restaurantName, restaurantId)
+            : await signUp(email, password, restaurantName, restaurantId, city)
         setIsSubmitting(false)
 
         if (!result.success) {
@@ -128,6 +130,20 @@ function AdminAuthContent() {
                                     onChange={(e) => setRestaurantId(e.target.value)}
                                     className="bg-transparent flex-1 outline-none text-base placeholder:text-[#70787d]"
                                 />
+                            </div>
+
+                            <div className="flex items-center bg-[#f5f4ed] rounded-xl px-4 py-3 border-2 border-transparent focus-within:border-[#0d6683]">
+                                <MapPin size={18} className="text-[#70787d] mr-3 shrink-0" />
+                                <select
+                                    value={city}
+                                    onChange={(e) => setCity(e.target.value)}
+                                    className="bg-transparent flex-1 outline-none text-base text-[#1b1c18] appearance-none"
+                                >
+                                    <option value="">City (shown to nearby customers)</option>
+                                    {CITIES.map(c => (
+                                        <option key={c.name} value={c.name}>{c.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         </>
                     )}

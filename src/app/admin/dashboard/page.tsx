@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
 import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation } from 'lucide-react'
 import { useAdminAuth } from '../../context/AdminAuthContext'
+import { CITIES } from '../../context/LocationContext'
 import { cn } from '../../../../lib/utils'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
@@ -1051,6 +1052,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
     const [address, setAddress] = useState('')
     const [phoneNumber, setPhoneNumber] = useState('')
     const [directionsUrl, setDirectionsUrl] = useState('')
+    const [city, setCity] = useState('')
 
     const fetchDetails = async () => {
         setIsLoading(true)
@@ -1061,7 +1063,8 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                 setAddress(data.address || '')
                 setPhoneNumber(data.phoneNumber || '')
                 setDirectionsUrl(data.directionsUrl || '')
-                setIsEditing(!data.address && !data.phoneNumber && !data.directionsUrl)
+                setCity(data.city || '')
+                setIsEditing(!data.address && !data.phoneNumber && !data.directionsUrl && !data.city)
             }
         } catch (err) {
             console.error('Error fetching restaurant details:', err)
@@ -1089,6 +1092,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                     address: address.trim(),
                     phoneNumber: phoneNumber.trim(),
                     directionsUrl: directionsUrl.trim(),
+                    city,
                 }),
             })
             const data = await res.json()
@@ -1097,6 +1101,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
             setAddress(data.address || '')
             setPhoneNumber(data.phoneNumber || '')
             setDirectionsUrl(data.directionsUrl || '')
+            setCity(data.city || '')
             setSaved(true)
             setIsEditing(false)
         } catch (err: any) {
@@ -1110,7 +1115,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
         return <p className="text-sm text-[#40484d]">Loading restaurant details...</p>
     }
 
-    const hasDetails = address || phoneNumber || directionsUrl
+    const hasDetails = address || phoneNumber || directionsUrl || city
 
     return (
         <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
@@ -1121,6 +1126,12 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
 
             {hasDetails && !isEditing ? (
                 <div className="flex flex-col gap-3">
+                    {city && (
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className={cn(jetbrainsMono.className, "text-xs text-[#70787d] uppercase tracking-wide")}>City</span>
+                            <span className="font-bold">{city}</span>
+                        </div>
+                    )}
                     {address && (
                         <div className="flex items-start gap-2 text-sm">
                             <MapPin size={16} className="text-[#70787d] mt-0.5 shrink-0" />
@@ -1149,8 +1160,18 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
             ) : (
                 <form onSubmit={handleSave} className="flex flex-col gap-3">
                     <p className="text-xs text-[#70787d]">
-                        Shown to customers on your restaurant&apos;s details page.
+                        Shown to customers on your restaurant&apos;s details page. City controls which customers see you when browsing restaurants by location.
                     </p>
+                    <select
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
+                    >
+                        <option value="">Select city</option>
+                        {CITIES.map(c => (
+                            <option key={c.name} value={c.name}>{c.name}</option>
+                        ))}
+                    </select>
                     <input
                         type="text"
                         placeholder="Address (e.g. 123 Ocean Front Walk, Santa Monica, CA)"

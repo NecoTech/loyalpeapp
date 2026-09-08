@@ -1,14 +1,26 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
-import { ArrowLeft, Search, Store, Gift, Percent } from 'lucide-react'
+import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google'
+import {
+    ArrowLeft,
+    Search,
+    Coffee,
+    ShoppingBag,
+    UtensilsCrossed,
+    Store,
+    Gift,
+    BadgeCheck,
+    X,
+    Share2,
+    HelpCircle,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
 
-const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['600'] })
+const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'] })
 
 type Transaction = {
     id: string
@@ -23,6 +35,20 @@ type Transaction = {
     createdAt: string
 }
 
+const MERCHANT_PALETTE = [
+    { color: '#38bdf8', Icon: Coffee },
+    { color: '#a3e635', Icon: ShoppingBag },
+    { color: '#fbbf24', Icon: UtensilsCrossed },
+    { color: '#f87171', Icon: Store },
+    { color: '#c084fc', Icon: Gift },
+]
+
+function getMerchantVisual(name: string) {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+    return MERCHANT_PALETTE[hash % MERCHANT_PALETTE.length]
+}
+
 function formatCurrency(value: number) {
     return `₹${value.toFixed(2)}`
 }
@@ -31,6 +57,25 @@ function discountLabel(transaction: Transaction) {
     if (!transaction.amount || transaction.discountAmount <= 0) return null
     const percentage = Math.round((transaction.discountAmount / transaction.amount) * 100)
     return `${percentage}% off`
+}
+
+function subtitleFor(transaction: Transaction) {
+    if (transaction.freeItemName) return transaction.freeItemName
+    const label = discountLabel(transaction)
+    if (label) return `${label} discount applied`
+    return 'Order Payment'
+}
+
+function statusTextFor(transaction: Transaction) {
+    if (transaction.freeItemName) return 'Reward Redeemed'
+    if (transaction.discountAmount > 0) return 'Discount Applied'
+    return 'Payment Completed'
+}
+
+function rewardsTextFor(transaction: Transaction) {
+    if (transaction.freeItemName) return `Reward redeemed: ${transaction.freeItemName}`
+    if (transaction.discountAmount > 0) return `${formatCurrency(transaction.discountAmount)} saved`
+    return 'Payment verified'
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -43,9 +88,16 @@ function dateGroupLabel(dateStr: string) {
     const yesterday = new Date()
     yesterday.setDate(today.getDate() - 1)
 
-    if (isSameDay(date, today)) return 'Today'
-    if (isSameDay(date, yesterday)) return 'Yesterday'
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    if (isSameDay(date, today)) {
+        return `Today • ${date.getDate()} ${date.toLocaleDateString('en-IN', { month: 'short' })}`
+    }
+    if (isSameDay(date, yesterday)) {
+        return `Yesterday • ${date.getDate()} ${date.toLocaleDateString('en-IN', { month: 'short' })}`
+    }
+    if (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) {
+        return `Earlier in ${date.toLocaleDateString('en-IN', { month: 'long' })}`
+    }
+    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 }
 
 export default function TransactionsPage() {
@@ -55,6 +107,11 @@ export default function TransactionsPage() {
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
+
+    const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null)
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+    const [isDrawerVisible, setIsDrawerVisible] = useState(false)
+    const drawerCloseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     useEffect(() => {
         const userId = user?.email || user?.phoneNumber
@@ -100,102 +157,237 @@ export default function TransactionsPage() {
         return groups
     }, [filteredTransactions])
 
+    const openDrawer = (transaction: Transaction) => {
+        if (drawerCloseTimeout.current) clearTimeout(drawerCloseTimeout.current)
+        setActiveTransaction(transaction)
+        setIsDrawerOpen(true)
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsDrawerVisible(true)))
+    }
+
+    const closeDrawer = () => {
+        setIsDrawerVisible(false)
+        drawerCloseTimeout.current = setTimeout(() => {
+            setIsDrawerOpen(false)
+            setActiveTransaction(null)
+        }, 200)
+    }
+
+    useEffect(() => {
+        if (!isDrawerOpen) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeDrawer()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [isDrawerOpen])
+
+    const activeVisual = activeTransaction ? getMerchantVisual(activeTransaction.restaurantName) : null
+
     return (
-        <div className={cn(hankenGrotesk.className, "bg-[#fbf9f2] text-[#1b1c18] min-h-screen pb-24")}>
+        <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col bg-[#fcf9f8] text-[#1c1b1b] pb-10")}>
             {/* Top App Bar */}
-            <header className="flex items-center gap-3 px-6 pt-6 pb-2 sticky top-0 bg-[#fbf9f2]/95 backdrop-blur-sm z-10">
+            <header className="sticky top-0 z-30 bg-[#fcf9f8] border-b-[3px] border-[#111111] px-4 py-3 flex items-center gap-3 shadow-[0px_3px_0px_#111111]">
                 <button
-                    aria-label="Back"
-                    className="w-10 h-10 -ml-2 flex items-center justify-center text-[#0d6683] hover:opacity-80 active:scale-95 transition-all"
+                    aria-label="Go Back"
                     onClick={() => router.back()}
+                    className="w-10 h-10 rounded-xl bg-white neo-border neo-shadow-badge active-press-sm flex items-center justify-center text-[#111111] transition-transform cursor-pointer"
                 >
                     <ArrowLeft size={22} />
                 </button>
-                <h1 className="text-[24px] leading-tight font-extrabold">Transactions</h1>
+                <h1 className="text-xl leading-[26px] tracking-[-0.015em] font-bold text-[#1c1b1b]">Transactions</h1>
             </header>
 
-            <main className="px-6 pt-4 max-w-2xl mx-auto">
-                {/* Search Bar */}
-                <div className="relative mb-8">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Search size={18} className="text-[#70787d]" />
-                    </div>
+            {/* Scrollable Content Canvas */}
+            <main className="flex-1 px-4 pt-4 pb-6 max-w-2xl w-full mx-auto">
+                {/* Search */}
+                <div className="relative mb-5">
                     <input
                         type="text"
                         placeholder="Search transactions..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 rounded-xl bg-[#f5f4ed] border-none focus:ring-2 focus:ring-[#4d6700] text-[#1b1c18] placeholder-[#bfc8cd] shadow-sm outline-none transition-shadow"
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full bg-white text-[#111111] placeholder:text-zinc-500 font-semibold text-sm py-3 pl-11 pr-4 neo-border rounded-xl neo-shadow-badge focus:outline-none focus:ring-0 focus:border-[#111111] transition-all"
                     />
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#111111] pointer-events-none flex items-center">
+                        <Search size={20} />
+                    </span>
                 </div>
 
                 {isLoading ? (
-                    <p className="text-center text-sm text-[#70787d] mt-8">Loading transactions...</p>
+                    <p className="text-center text-sm font-semibold text-[#434656] mt-8">Loading transactions...</p>
                 ) : groupedTransactions.length === 0 ? (
-                    <div className="flex flex-col items-center text-center gap-3 mt-12">
-                        <div className="w-14 h-14 rounded-full bg-[#f0eee7] text-[#70787d] flex items-center justify-center">
+                    <div className="flex flex-col items-center text-center gap-3 mt-12 bg-white neo-border rounded-xl neo-shadow-1 p-6">
+                        <div className="w-14 h-14 rounded-xl bg-[#f0edec] neo-border neo-shadow-badge text-[#111111] flex items-center justify-center">
                             <Store size={24} />
                         </div>
-                        <h3 className="font-bold text-lg">No transactions yet</h3>
-                        <p className="text-sm text-[#70787d] max-w-xs">
+                        <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">No transactions yet</h3>
+                        <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656] max-w-xs">
                             Your payments will show up here once you start paying with loyalty rewards.
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         {groupedTransactions.map(group => (
-                            <div key={group.label}>
-                                <h3 className={cn(jetbrainsMono.className, "text-xs text-[#70787d] uppercase tracking-wider mb-3 pt-2")}>
-                                    {group.label}
-                                </h3>
-                                <div className="flex flex-col gap-3">
-                                    {group.items.map(transaction => (
-                                        <div
-                                            key={transaction.id}
-                                            className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm"
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-[#eae8e1] flex items-center justify-center text-[#1b1c18] shrink-0">
-                                                    <Store size={20} />
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-[#1b1c18]">{transaction.restaurantName}</p>
-                                                    <p className="text-xs text-[#70787d]">
-                                                        {new Date(transaction.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        {' · '}
-                                                        {new Date(transaction.createdAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
-                                                    </p>
-                                                    {(transaction.discountAmount > 0 || transaction.freeItemName) && (
-                                                        <div className="flex items-center gap-2 text-xs mt-0.5">
-                                                            {transaction.discountAmount > 0 && (
-                                                                <span className="flex items-center gap-1 text-[#4d6700]">
-                                                                    <Percent size={12} />
-                                                                    {discountLabel(transaction) && `${discountLabel(transaction)} · `}
-                                                                    {formatCurrency(transaction.discountAmount)} saved
-                                                                </span>
-                                                            )}
-                                                            {transaction.freeItemName && (
-                                                                <span className="flex items-center gap-1 text-[#0d6683]">
-                                                                    <Gift size={12} /> {transaction.freeItemName}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-lg font-extrabold text-[#1b1c18]">
-                                                    -{formatCurrency(transaction.finalAmount)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <section key={group.label} className="space-y-2.5">
+                                <div className="flex items-center justify-between px-1">
+                                    <span className="text-[13px] leading-[16px] tracking-[0.03em] font-extrabold uppercase bg-[#f0edec] text-[#1c1b1b] px-2 py-0.5 rounded border border-[#1c1b1b]/20">
+                                        {group.label}
+                                    </span>
+                                    <span className="text-[11px] leading-[14px] tracking-[0.04em] font-bold text-[#434656]">
+                                        {group.items.length} Transaction{group.items.length === 1 ? '' : 's'}
+                                    </span>
                                 </div>
-                            </div>
+
+                                {group.items.map(transaction => {
+                                    const visual = getMerchantVisual(transaction.restaurantName)
+                                    const Icon = visual.Icon
+                                    const time = new Date(transaction.createdAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+                                    const maskedId = `••${transaction.id.slice(-4).toUpperCase()}`
+
+                                    return (
+                                        <article
+                                            key={transaction.id}
+                                            onClick={() => openDrawer(transaction)}
+                                            className="bg-white neo-border rounded-xl p-3.5 neo-shadow-1 active-press cursor-pointer transition-all hover:bg-[#fcf9f8] flex flex-col justify-between min-h-[116px]"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className="w-12 h-12 rounded-xl neo-border neo-shadow-badge flex items-center justify-center shrink-0"
+                                                        style={{ backgroundColor: visual.color }}
+                                                    >
+                                                        <Icon size={24} className="text-[#111111]" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">
+                                                            {transaction.restaurantName}
+                                                        </h3>
+                                                        <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656]">
+                                                            {subtitleFor(transaction)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    {transaction.freeItemName ? (
+                                                        <span className="inline-block px-2 py-0.5 bg-[#c084fc] text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge">
+                                                            {transaction.freeItemName}
+                                                        </span>
+                                                    ) : transaction.discountAmount > 0 ? (
+                                                        <span className="inline-block px-2 py-0.5 bg-[#a3e635] text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold rounded-md neo-border-sm neo-shadow-badge">
+                                                            -{formatCurrency(transaction.discountAmount)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[17px] leading-[22px] tracking-[-0.01em] font-extrabold text-[#111111]">
+                                                            -{formatCurrency(transaction.finalAmount)}
+                                                        </span>
+                                                    )}
+                                                    <p className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold text-[#434656] mt-1">{time}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2 border-t border-dashed border-[#c4c5d9] text-[11px] leading-[14px] tracking-[0.04em] font-extrabold mt-2.5">
+                                                <div className="flex items-center gap-1.5 text-[#111111]">
+                                                    {transaction.freeItemName && <Gift size={14} className="text-[#6b5100]" />}
+                                                    <span className="text-[#434656]">{statusTextFor(transaction)}</span>
+                                                </div>
+                                                <span className={cn(jetbrainsMono.className, "text-[11px] text-[#747688]")}>
+                                                    ID: {maskedId}
+                                                </span>
+                                            </div>
+                                        </article>
+                                    )
+                                })}
+                            </section>
                         ))}
                     </div>
                 )}
             </main>
+
+            {/* Transaction Detail Bottom Sheet */}
+            {isDrawerOpen && activeTransaction && activeVisual && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className={cn(
+                        "fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-end justify-center transition-opacity duration-200",
+                        isDrawerVisible ? "opacity-100" : "opacity-0"
+                    )}
+                    onClick={e => { if (e.target === e.currentTarget) closeDrawer() }}
+                >
+                    <div
+                        className={cn(
+                            "w-full max-w-[428px] bg-[#fcf9f8] neo-border border-b-0 rounded-t-2xl p-5 shadow-[0px_-4px_0px_#111111] transform transition-transform duration-200 ease-out",
+                            isDrawerVisible ? "translate-y-0" : "translate-y-full"
+                        )}
+                    >
+                        <div className="w-12 h-1.5 bg-[#111111] rounded-full mx-auto mb-4" />
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-[#2ED573] border-2 border-[#111111]" />
+                                <span className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold uppercase text-[#434656]">Transaction Details</span>
+                            </div>
+                            <button
+                                aria-label="Close details"
+                                onClick={closeDrawer}
+                                className="w-8 h-8 rounded-lg bg-white neo-border-sm flex items-center justify-center text-[#111111] cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="bg-white neo-border rounded-xl p-4 neo-shadow-1 mb-4">
+                            <div className="flex items-center gap-3 pb-3 border-b-2 border-dashed border-[#c4c5d9]">
+                                <div
+                                    className="w-12 h-12 rounded-xl neo-border flex items-center justify-center"
+                                    style={{ backgroundColor: activeVisual.color }}
+                                >
+                                    <activeVisual.Icon size={24} className="text-[#111111]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">{activeTransaction.restaurantName}</h3>
+                                    <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656]">{subtitleFor(activeTransaction)}</p>
+                                </div>
+                            </div>
+                            <div className="py-3 flex justify-between items-center">
+                                <span className="text-sm leading-5 font-medium text-[#434656]">Amount / Perk</span>
+                                <span className="text-xl leading-[26px] tracking-[-0.015em] font-extrabold text-[#111111]">
+                                    {activeTransaction.finalAmount > 0
+                                        ? `-${formatCurrency(activeTransaction.finalAmount)}`
+                                        : activeTransaction.freeItemName
+                                            ? `Redeemed: ${activeTransaction.freeItemName}`
+                                            : formatCurrency(activeTransaction.finalAmount)}
+                                </span>
+                            </div>
+                            <div className="py-2.5 border-t border-[#e5e2e1] flex justify-between items-center text-xs leading-4 font-semibold">
+                                <span className="text-[#434656]">Transaction ID</span>
+                                <span className={cn(jetbrainsMono.className, "font-bold text-[#111111]")}>
+                                    TXN-{activeTransaction.id.slice(-8).toUpperCase()}
+                                </span>
+                            </div>
+                            <div className="py-2 border-t border-[#e5e2e1] flex justify-between items-center text-xs leading-4 font-semibold">
+                                <span className="text-[#434656]">Rewards Earned</span>
+                                <span className="font-bold text-[#008037] flex items-center gap-1">
+                                    <BadgeCheck size={15} /> {rewardsTextFor(activeTransaction)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2.5">
+                            <button
+                                onClick={closeDrawer}
+                                className="flex-1 py-3 rounded-xl bg-white text-[#111111] text-[15px] leading-[18px] tracking-[0.02em] font-extrabold neo-border neo-shadow-badge active-press-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <Share2 size={18} /> Share Receipt
+                            </button>
+                            <button
+                                onClick={closeDrawer}
+                                className="flex-1 py-3 rounded-xl bg-[#2e5bff] text-white text-[15px] leading-[18px] tracking-[0.02em] font-extrabold neo-border neo-shadow-badge active-press-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <HelpCircle size={18} /> Need Help
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

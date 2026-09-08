@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
-import { ArrowLeft, ArrowRight, Check, Gift, MapPin, Navigation, Phone, Store } from 'lucide-react'
+import { Plus_Jakarta_Sans } from 'next/font/google'
+import { ArrowLeft, Check, ChevronRight, Gift, MapPin, Navigation, Phone, Store } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { cn } from '../../../../../lib/utils'
 
-const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['600'] })
+const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
 type RestaurantDetails = {
     id: string
@@ -49,66 +48,16 @@ function rewardLabel(item: LoyaltyRewardItem) {
     return item.freeItemName || 'Free item'
 }
 
-// Glossy gradient + diagonal shine overlay, same technique as the loyalty
-// page's card stack — copied here since this page's cards use a different
-// (horizontal arc) layout, not the vertical stack, so it isn't shared code.
-function CardGloss({ from, mid, to, shineOpacity }: { from: string; mid: string; to: string; shineOpacity: number }) {
-    return (
-        <div className="absolute inset-0 pointer-events-none z-0" style={{ background: `linear-gradient(135deg, ${from} 0%, ${mid} 45%, ${to} 100%)` }}>
-            <div
-                className="absolute inset-0"
-                style={{
-                    opacity: shineOpacity,
-                    background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.7) 45%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.7) 55%, transparent 70%)',
-                    transform: 'skewX(-25deg)',
-                }}
-            />
-        </div>
-    )
+function ordinal(n: number) {
+    const v = n % 100
+    if (v >= 11 && v <= 13) return 'th'
+    switch (n % 10) {
+        case 1: return 'st'
+        case 2: return 'nd'
+        case 3: return 'rd'
+        default: return 'th'
+    }
 }
-
-type CardTheme = {
-    bg: string
-    text: string
-    checkedBg: string
-    checkedIcon: string
-    pendingBg: string
-    pendingIcon: string
-    art: JSX.Element
-}
-
-const CARD_THEMES: CardTheme[] = [
-    {
-        bg: 'bg-[#2563eb]', text: 'text-white',
-        checkedBg: 'bg-white shadow-sm', checkedIcon: 'text-blue-600',
-        pendingBg: 'bg-white/20 border border-white/30 text-white/80 backdrop-blur-sm', pendingIcon: 'text-white/60',
-        art: <CardGloss from="rgb(59, 130, 246)" mid="rgb(29, 78, 216)" to="rgb(30, 58, 138)" shineOpacity={0.5} />,
-    },
-    {
-        bg: 'bg-[#fce7f3]', text: 'text-[#1b1c18]',
-        checkedBg: 'bg-white shadow-sm', checkedIcon: 'text-[#0d6683]',
-        pendingBg: 'border border-black/5 text-black/50 bg-white/40 backdrop-blur-sm', pendingIcon: 'text-black/40',
-        art: <CardGloss from="rgb(251, 207, 232)" mid="rgb(244, 114, 182)" to="rgb(219, 39, 119)" shineOpacity={0.6} />,
-    },
-    {
-        bg: 'bg-[#dc2626]', text: 'text-white',
-        checkedBg: 'bg-white shadow-sm', checkedIcon: 'text-red-600',
-        pendingBg: 'bg-white/20 border border-white/30 text-white/80 backdrop-blur-sm', pendingIcon: 'text-white/60',
-        art: <CardGloss from="rgb(239, 68, 68)" mid="rgb(185, 28, 28)" to="rgb(127, 29, 29)" shineOpacity={0.5} />,
-    },
-    {
-        bg: 'bg-[#0d6683]', text: 'text-white',
-        checkedBg: 'bg-white shadow-sm', checkedIcon: 'text-[#0d6683]',
-        pendingBg: 'bg-white/20 border border-white/30 text-white/80 backdrop-blur-sm', pendingIcon: 'text-white/60',
-        art: <CardGloss from="rgb(56, 189, 213)" mid="rgb(13, 102, 131)" to="rgb(5, 49, 63)" shineOpacity={0.5} />,
-    },
-    {
-        bg: 'bg-[#ebddff]', text: 'text-[#1b1c18]',
-        checkedBg: 'bg-white shadow-sm', checkedIcon: 'text-[#4f3d73]',
-        pendingBg: 'border border-black/5 text-black/50 bg-white/40 backdrop-blur-sm', pendingIcon: 'text-black/40',
-        art: <CardGloss from="rgb(210, 188, 251)" mid="rgb(79, 61, 115)" to="rgb(45, 32, 71)" shineOpacity={0.5} />,
-    },
-]
 
 function getInitials(name: string) {
     return name
@@ -119,119 +68,113 @@ function getInitials(name: string) {
         .join('') || '?'
 }
 
-// Arc scroll behavior: as the horizontal scroller moves, each card rotates
-// and dips away from center based on its distance from the viewport's
-// center — ported directly from the mockup's scroll listener, using refs
-// instead of DOM queries since this runs every scroll frame.
-const MAX_ROTATION_DEG = 12
-const MAX_Y_OFFSET_PX = 30
+const CARD_THEMES = [
+    { gradient: 'bg-gradient-to-br from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]', mutedText: 'text-blue-100/90' },
+    { gradient: 'bg-gradient-to-br from-[#FF80BF] via-[#F472B6] to-[#FB7185]', mutedText: 'text-rose-100' },
+    { gradient: 'bg-gradient-to-br from-[#FDBA74] via-[#FB923C] to-[#EA580C]', mutedText: 'text-orange-100' },
+    { gradient: 'bg-gradient-to-br from-[#6EE7B7] via-[#34D399] to-[#059669]', mutedText: 'text-emerald-100' },
+    { gradient: 'bg-gradient-to-br from-[#C4B5FD] via-[#A78BFA] to-[#7C3AED]', mutedText: 'text-violet-100' },
+]
 
-function CardScroller({ cards, restaurantName }: { cards: LoyaltyCard[]; restaurantName: string }) {
-    const containerRef = useRef<HTMLDivElement>(null)
-    const cardRefs = useRef<(HTMLDivElement | null)[]>([])
-
-    useEffect(() => {
-        const container = containerRef.current
-        if (!container) return
-
-        const updateArc = () => {
-            const containerCenter = container.scrollLeft + container.clientWidth / 2
-            cardRefs.current.forEach(item => {
-                if (!item) return
-                const itemCenter = item.offsetLeft + item.clientWidth / 2
-                const distance = itemCenter - containerCenter
-                const normalized = distance / container.clientWidth
-                const rotation = normalized * MAX_ROTATION_DEG
-                const yOffset = Math.abs(normalized) * MAX_Y_OFFSET_PX
-                const scale = 1 - Math.abs(normalized) * 0.05
-                item.style.transform = `translateY(${yOffset}px) rotate(${rotation}deg) scale(${scale})`
-                item.style.zIndex = Math.abs(normalized) < 0.3 ? '10' : '5'
-            })
-        }
-
-        updateArc()
-        container.addEventListener('scroll', updateArc, { passive: true })
-        window.addEventListener('resize', updateArc)
-
-        // Center the active (first) card once the layout has settled. The
-        // scroll listener above is what actually re-runs updateArc() once
-        // the browser applies the scroll — calling updateArc() a second
-        // time here, synchronously right after scrollTo(), read scrollLeft
-        // before the browser had applied it, produced a transform for the
-        // stale position, and then got corrected a frame later once the
-        // real scroll event fired — that two-step correction is what showed
-        // up as the first card jittering into place.
-        const timeoutId = setTimeout(() => {
-            const first = cardRefs.current[0]
-            if (first) {
-                const scrollPos = first.offsetLeft - container.clientWidth / 2 + first.clientWidth / 2
-                container.scrollTo({ left: scrollPos, behavior: 'auto' })
-            }
-        }, 50)
-
-        return () => {
-            container.removeEventListener('scroll', updateArc)
-            window.removeEventListener('resize', updateArc)
-            clearTimeout(timeoutId)
-        }
-    }, [cards])
-
+function LoyaltyCardsCarousel({ cards }: { cards: LoyaltyCard[] }) {
     return (
-        <div
-            ref={containerRef}
-            className="hide-scrollbar flex w-full overflow-x-auto snap-x snap-mandatory items-end h-[260px] px-[7.5%] pb-4 gap-4"
-            style={{ scrollSnapType: 'x mandatory' }}
-        >
-            {cards.map((card, index) => {
-                const theme = CARD_THEMES[index % CARD_THEMES.length]
-                const isLightBadge = theme.text !== 'text-white'
-                return (
-                    <div
-                        key={card.id}
-                        ref={el => { cardRefs.current[index] = el }}
-                        className={cn("card-transition snap-center shrink-0 w-[85%] h-48 rounded-2xl overflow-hidden shadow-[0_-10px_25px_rgba(0,0,0,0.4)]", theme.bg)}
-                        style={{ scrollSnapAlign: 'center', transformOrigin: 'center bottom' }}
-                    >
-                        {theme.art}
-                        <div className={cn("p-4 h-full flex flex-col relative z-10", theme.text)}>
-                            <span className={cn(
-                                jetbrainsMono.className,
-                                "text-[11px] tracking-wide uppercase font-semibold px-2.5 py-1 rounded-full self-start backdrop-blur-sm border",
-                                isLightBadge ? "bg-black/5 border-black/10" : "bg-white/10 border-white/20"
-                            )}>
-                                {card.name}
-                            </span>
+        <section className="pt-2">
+            <div className="flex items-center justify-between mb-3 px-0.5">
+                <h2 className="text-base font-black tracking-tight uppercase text-zinc-900">Loyalty Cards</h2>
+                {cards.length > 1 && (
+                    <span className="text-xs font-bold text-zinc-400 flex items-center gap-0.5">
+                        Swipe <ChevronRight size={14} />
+                    </span>
+                )}
+            </div>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-5 px-5 snap-x snap-mandatory">
+                {cards.map((card, index) => {
+                    const theme = CARD_THEMES[index % CARD_THEMES.length]
+                    const unlockedCount = card.items.filter(i => i.redeemed).length
+                    const totalCount = card.items.length
+                    const nextReward = card.items.find(i => !i.redeemed)
+                    const compact = totalCount <= 4
 
-                            <div className="grid grid-cols-5 gap-2.5 flex-1 content-center mt-2">
-                                {card.items.map(item => (
-                                    <div key={item.id} className="flex flex-col items-center gap-1">
-                                        <span className="text-[8px] leading-tight text-center opacity-80 line-clamp-2">
-                                            {rewardLabel(item)}
-                                        </span>
-                                        <div
-                                            className={cn(
-                                                "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-                                                item.redeemed ? theme.checkedBg : theme.pendingBg
-                                            )}
-                                            aria-label={item.redeemed ? 'Redeemed' : 'Not redeemed'}
-                                        >
-                                            {item.redeemed ? (
-                                                <Check size={18} className={theme.checkedIcon} />
-                                            ) : item.rewardType === 'freeItem' ? (
-                                                <Gift size={16} className={theme.pendingIcon} />
-                                            ) : (
-                                                <span className="text-xs font-bold">{item.stampsRequired}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                    return (
+                        <article
+                            key={card.id}
+                            className={cn(
+                                "w-[86%] sm:w-[320px] shrink-0 snap-start rounded-3xl border-2 border-black shop-shadow text-white relative overflow-hidden flex flex-col justify-between gap-3 h-52 p-5",
+                                theme.gradient
+                            )}
+                        >
+                            <div className="absolute -right-12 -top-16 w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+                            <div className="flex items-center justify-between relative z-10">
+                                <span className="glass-pill px-3 py-1 rounded-xl text-[11px] font-black tracking-widest uppercase border border-white/30 text-white shadow-sm">
+                                    {card.name}
+                                </span>
+                                <span className={cn("text-[11px] font-semibold tracking-wider", theme.mutedText)}>
+                                    {unlockedCount}/{totalCount} Unlocked
+                                </span>
                             </div>
-                        </div>
-                        <span className="sr-only">{card.name} for {restaurantName}</span>
-                    </div>
-                )
-            })}
-        </div>
+
+                            {compact ? (
+                                <div className="relative z-10 pt-2">
+                                    <div className="flex items-end gap-3.5">
+                                        {card.items.map(item => (
+                                            <div key={item.id} className="flex flex-col items-center gap-1.5">
+                                                <span className={cn("text-[10px] font-bold text-center leading-tight max-w-[56px] truncate", theme.mutedText)}>
+                                                    {rewardLabel(item)}
+                                                </span>
+                                                <div className={cn(
+                                                    "w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm",
+                                                    item.redeemed ? "bg-white text-zinc-900" : "glass-slot border border-white/40 text-white"
+                                                )}>
+                                                    {item.redeemed ? (
+                                                        <Check size={18} className="stroke-[3.5]" />
+                                                    ) : item.rewardType === 'freeItem' ? (
+                                                        <Gift size={18} />
+                                                    ) : (
+                                                        item.stampsRequired
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="relative z-10 grid grid-cols-5 gap-2">
+                                    {card.items.map(item => (
+                                        <div key={item.id} className="flex flex-col items-center gap-1">
+                                            <div className={cn(
+                                                "w-9 h-9 rounded-full flex items-center justify-center shrink-0",
+                                                item.redeemed ? "bg-white text-zinc-900 border-2 border-black shop-shadow-sm" : "glass-slot border border-white/40 text-white"
+                                            )}>
+                                                {item.redeemed ? (
+                                                    <Check size={16} className="stroke-[3.5]" />
+                                                ) : item.rewardType === 'freeItem' ? (
+                                                    <Gift size={14} />
+                                                ) : (
+                                                    <span className="text-xs font-bold">{item.stampsRequired}</span>
+                                                )}
+                                            </div>
+                                            <span className={cn("text-[9px] font-bold text-center leading-tight truncate w-full", theme.mutedText)}>
+                                                {rewardLabel(item)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className={cn("relative z-10 flex items-center justify-between text-[11px] border-t border-white/15 pt-2", theme.mutedText)}>
+                                <span>
+                                    {nextReward
+                                        ? `Next reward at ${nextReward.stampsRequired}${ordinal(nextReward.stampsRequired)} visit`
+                                        : 'All rewards unlocked!'}
+                                </span>
+                                <span className="font-mono tracking-wider font-semibold">#{card.id.slice(-6).toUpperCase()}</span>
+                            </div>
+                        </article>
+                    )
+                })}
+            </div>
+        </section>
     )
 }
 
@@ -286,117 +229,100 @@ export default function RestaurantDetailsPage() {
     const initials = restaurant ? getInitials(restaurant.name) : null
 
     return (
-        <div className={cn(hankenGrotesk.className, "bg-white text-[#1b1c18] h-screen flex flex-col overflow-hidden max-w-md mx-auto md:shadow-2xl md:my-8 md:rounded-[1.5rem] relative")}>
-            <main
-                className="flex-1 flex flex-col relative overflow-hidden"
-                style={{
-                    backgroundColor: '#fbf9f2',
-                    backgroundImage:
-                        'radial-gradient(at 0% 0%, rgba(137, 207, 240, 0.15) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(209, 187, 250, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(137, 207, 240, 0.1) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(209, 187, 250, 0.1) 0px, transparent 50%)',
-                    backgroundAttachment: 'fixed',
-                }}
-            >
-                <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-30 mix-blend-soft-light z-0" xmlns="http://www.w3.org/2000/svg">
-                    <filter id="detailsNoiseFilter">
-                        <feTurbulence baseFrequency="0.85" numOctaves={3} stitchTiles="stitch" type="fractalNoise" />
-                    </filter>
-                    <rect filter="url(#detailsNoiseFilter)" height="100%" width="100%" />
-                </svg>
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#F6F8FA] text-zinc-900 flex justify-center selection:bg-lime-300")}>
+            <div className="w-full max-w-md min-h-screen bg-white flex flex-col relative pb-28">
+                {/* Top Bar */}
+                <header className="pt-4 pb-2 px-5 flex items-center justify-between sticky top-0 z-30 bg-white/95 backdrop-blur-md">
+                    <button
+                        aria-label="Go back"
+                        onClick={() => router.push('/restaurants')}
+                        className="w-11 h-11 rounded-2xl bg-white border-2 border-black shop-shadow-sm active:translate-x-px active:translate-y-px active:shadow-none transition-all flex items-center justify-center group cursor-pointer"
+                    >
+                        <ArrowLeft size={20} strokeWidth={2.5} className="text-zinc-900 group-hover:-translate-x-0.5 transition-transform" />
+                    </button>
+                    <div />
+                    <div className="w-11 h-11" aria-hidden="true" />
+                </header>
 
-                <button
-                    aria-label="Back to restaurants"
-                    onClick={() => router.push('/restaurants')}
-                    className="absolute top-6 left-6 z-20 text-[#1b1c18] hover:opacity-70 active:scale-95 transition-all"
-                >
-                    <ArrowLeft size={28} />
-                </button>
-
-                {/* Fixed Top Details */}
-                <div className="relative z-10 w-full flex flex-col items-center pt-16 pb-2 px-6 shrink-0">
-                    {/* Hero — no restaurant photo in this app, so a colored initials block stands in for one */}
-                    <div className="w-full h-48 rounded-2xl overflow-hidden shadow-lg mb-6 bg-gradient-to-br from-[#89cff0] to-[#d1bbfa] flex items-center justify-center">
-                        {initials ? (
-                            <span className="text-6xl font-extrabold text-white/90 tracking-tight">{initials}</span>
-                        ) : (
-                            <Store size={48} className="text-white/90" />
-                        )}
-                    </div>
-
-                    <div className="w-full flex flex-col items-start gap-1">
-                        <h1 className="text-3xl font-bold text-[#1b1c18] tracking-tight">
-                            {restaurant?.name ?? 'Loading...'}
-                        </h1>
-                        {restaurant?.address && (
-                            <div className="flex items-center gap-1 text-[#40484d] text-sm mt-1">
-                                <MapPin size={16} className="opacity-60 shrink-0" />
-                                <span>{restaurant.address}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {(restaurant?.directionsUrl || restaurant?.phoneNumber) && (
-                        <div className="flex gap-3 w-full mt-6">
-                            {restaurant?.directionsUrl && (
-                                <a
-                                    href={restaurant.directionsUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-black/5 rounded-xl shadow-sm hover:bg-[#f5f4ed] transition-colors"
-                                >
-                                    <Navigation size={18} className="text-[#0d6683]" />
-                                    <span className="text-sm font-semibold">Directions</span>
-                                </a>
-                            )}
-                            {restaurant?.phoneNumber && (
-                                <a
-                                    href={`tel:${restaurant.phoneNumber}`}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-black/5 rounded-xl shadow-sm hover:bg-[#f5f4ed] transition-colors"
-                                >
-                                    <Phone size={18} className="text-[#0d6683]" />
-                                    <span className="text-sm font-semibold">Call</span>
-                                </a>
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto px-5 pt-3 space-y-6">
+                    {/* Hero */}
+                    <section className="relative">
+                        <div className="w-full h-48 sm:h-52 rounded-3xl bg-gradient-to-br from-[#A2C7FE] via-[#B8D3FE] to-[#DEC6FF] border-2 border-black shop-shadow flex items-center justify-center relative overflow-hidden">
+                            <div className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full border-4 border-white/25 pointer-events-none" />
+                            <div className="absolute -left-6 -top-6 w-28 h-28 rounded-full border-4 border-white/20 pointer-events-none" />
+                            {initials ? (
+                                <span className="text-white text-6xl sm:text-7xl font-black tracking-tight select-none drop-shadow-sm">
+                                    {initials}
+                                </span>
+                            ) : (
+                                <Store size={56} className="text-white/90" />
                             )}
                         </div>
-                    )}
-                </div>
+                    </section>
 
-                {/* Card Scroll Area */}
-                <div className="relative z-10 w-full flex-1 flex flex-col justify-end pb-8">
+                    {/* Merchant Meta */}
+                    <section className="space-y-4">
+                        <div>
+                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900">
+                                {restaurant?.name ?? 'Loading...'}
+                            </h1>
+                            {restaurant?.address && (
+                                <div className="mt-2.5 flex items-start gap-2 text-zinc-600 text-[13px] leading-relaxed">
+                                    <MapPin size={16} strokeWidth={2} className="text-zinc-700 shrink-0 mt-0.5" />
+                                    <p>{restaurant.address}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {(restaurant?.directionsUrl || restaurant?.phoneNumber) && (
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                {restaurant?.directionsUrl && (
+                                    <a
+                                        href={restaurant.directionsUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="h-12 flex items-center justify-center gap-2 rounded-2xl bg-white border-2 border-black font-extrabold text-sm text-zinc-900 shop-shadow hover:bg-zinc-50 active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none transition-all"
+                                    >
+                                        <Navigation size={16} strokeWidth={2.5} className="text-sky-600" />
+                                        <span>Directions</span>
+                                    </a>
+                                )}
+                                {restaurant?.phoneNumber && (
+                                    <a
+                                        href={`tel:${restaurant.phoneNumber}`}
+                                        className="h-12 flex items-center justify-center gap-2 rounded-2xl bg-white border-2 border-black font-extrabold text-sm text-zinc-900 shop-shadow hover:bg-zinc-50 active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none transition-all"
+                                    >
+                                        <Phone size={16} strokeWidth={2.5} className="text-emerald-600" />
+                                        <span>Call</span>
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Loyalty Cards */}
                     {isLoading ? (
-                        <p className="text-center text-sm text-[#70787d]">Loading loyalty cards...</p>
+                        <p className="text-center text-sm text-zinc-500 pt-4">Loading loyalty cards...</p>
                     ) : cards.length === 0 ? (
-                        <p className="text-center text-sm text-[#70787d] px-6">
+                        <p className="text-center text-sm text-zinc-500 px-2 pt-4">
                             {restaurant?.name ?? 'This restaurant'} hasn&apos;t set up any loyalty rewards yet.
                         </p>
                     ) : (
-                        <CardScroller cards={cards} restaurantName={restaurant?.name ?? 'Restaurant'} />
+                        <LoyaltyCardsCarousel cards={cards} />
                     )}
                 </div>
 
-                {/* Pay Button */}
-                <div className="relative z-10 px-6 mt-6 mb-8 w-full shrink-0">
+                {/* Floating Pay Button */}
+                <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white/95 backdrop-blur-md border-t border-zinc-200 z-40">
                     <button
                         onClick={() => router.push(`/restaurant/${id}`)}
-                        className="w-full flex items-center justify-between px-6 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform bg-[#c5f253] text-[#151f00]"
+                        className="w-full h-12 bg-[#B4F34C] hover:bg-[#A1E635] text-zinc-900 border-2 border-black rounded-2xl font-black text-base shop-shadow flex items-center justify-center gap-2 active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none transition-all uppercase tracking-wide cursor-pointer"
                     >
                         <span>Pay</span>
-                        <ArrowRight size={22} />
                     </button>
                 </div>
-            </main>
-
-            <style jsx global>{`
-                .hide-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .hide-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-                .card-transition {
-                    transition: transform 0.1s ease-out;
-                }
-            `}</style>
+            </div>
         </div>
     )
 }

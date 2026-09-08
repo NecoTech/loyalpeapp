@@ -263,11 +263,15 @@ function StackedLoyaltyCard({
         <div
             onClick={onClick}
             className={cn(
-                "card-transition absolute overflow-hidden cursor-pointer",
+                "card-transition overflow-hidden cursor-pointer",
                 theme.bg,
                 isFeatured
-                    ? "left-1/2 bottom-1/2 -translate-x-1/2 translate-y-1/2 w-[90%] h-[57vw] rounded-[24px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] z-[105]"
-                    : cn("left-1/2 -translate-x-1/2", geometry.shadow, geometry.hoverLift, geometry.roundedTop ? "rounded-t-3xl" : "rounded-2xl")
+                    // Fixed (viewport-relative), not absolute (stack-container-relative) —
+                    // the stack container can be taller than the viewport when there are
+                    // several cards, so centering against it would drift the zoomed card
+                    // out of view instead of centering it on screen.
+                    ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[380px] h-[57vw] max-h-[420px] rounded-[24px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] z-[105]"
+                    : cn("absolute left-1/2 -translate-x-1/2", geometry.shadow, geometry.hoverLift, geometry.roundedTop ? "rounded-t-3xl" : "rounded-2xl")
             )}
             style={isFeatured ? undefined : {
                 bottom: `${geometry.bottomPx}px`,
@@ -450,6 +454,14 @@ function LoyaltyPageContent() {
     // every card in the set gets a distinct theme (cycling only past 6 cards).
     const cardThemeIndex = new Map(cards.map((card, index) => [card.id, index]))
 
+    // The stack is positioned via `bottom: Npx`, so its natural height is
+    // whatever the back-most card's offset + height needs — on a short
+    // viewport, or with several cards, that can exceed 100vh. Compute it so
+    // the container can grow past the screen instead of clipping cards off
+    // the top, with 100vh as a floor for the common few-card case.
+    const deepestGeometry = getStackGeometry(Math.max(orderedCards.length - 1, 0))
+    const stackContentHeight = deepestGeometry.bottomPx + deepestGeometry.heightPx + 96
+
     return (
         <div className={cn(hankenGrotesk.className, "h-screen flex flex-col bg-white text-[#1b1c18] overflow-hidden max-w-md mx-auto md:shadow-2xl md:my-8 md:rounded-[1.5rem] relative")}>
             <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-[#fbf9f2]">
@@ -480,18 +492,29 @@ function LoyaltyPageContent() {
                         </p>
                     </div>
                 ) : (
-                    <div className="relative w-full h-screen flex flex-col items-center justify-end pb-8">
-                        {orderedCards.map((card, index) => (
-                            <StackedLoyaltyCard
-                                key={card.id}
-                                card={card}
-                                restaurantName={restaurant?.name ?? 'Restaurant'}
-                                positionFromFront={index}
-                                themeIndex={cardThemeIndex.get(card.id) ?? 0}
-                                isFeatured={featuredCardId === card.id}
-                                onClick={() => handleCardClick(card.id)}
-                            />
-                        ))}
+                    // absolute inset-0 (not a normal flex child of `main`) so this
+                    // gets its own scroll container with justify-end anchoring —
+                    // that keeps the front card visible by default when the stack
+                    // is taller than the viewport, with older cards reachable by
+                    // scrolling up, instead of `main`'s own justify-center clipping
+                    // both ends symmetrically.
+                    <div className="absolute inset-0 overflow-y-auto no-scrollbar flex flex-col justify-end">
+                        <div
+                            className="relative w-full shrink-0 flex flex-col items-center justify-end pb-8"
+                            style={{ minHeight: `max(100vh, ${stackContentHeight}px)` }}
+                        >
+                            {orderedCards.map((card, index) => (
+                                <StackedLoyaltyCard
+                                    key={card.id}
+                                    card={card}
+                                    restaurantName={restaurant?.name ?? 'Restaurant'}
+                                    positionFromFront={index}
+                                    themeIndex={cardThemeIndex.get(card.id) ?? 0}
+                                    isFeatured={featuredCardId === card.id}
+                                    onClick={() => handleCardClick(card.id)}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
             </main>

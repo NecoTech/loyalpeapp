@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes"
 import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext'
+import { LocationProvider } from './context/LocationContext'
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -66,9 +67,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <CartProvider>
-              {children}
-            </CartProvider>
+            <LocationProvider>
+              <CartProvider>
+                {children}
+              </CartProvider>
+            </LocationProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -18,6 +18,7 @@ export type RestaurantOwnerDocument = {
     address?: string
     phoneNumber?: string
     directionsUrl?: string
+    city?: string
     createdAt: Date
     updatedAt?: Date
 }
@@ -84,6 +85,10 @@ export type TransactionDocument = {
     discountValue?: number
     finalAmount: number
     freeItemName?: string
+    // The payment gateway's order reference, when the transaction came from
+    // an online payment. Uniquely indexed (sparse) so the same payment can
+    // never be recorded twice, even if the client confirms it more than once.
+    orderId?: string
     createdAt: Date
 }
 
@@ -187,6 +192,7 @@ export async function getTransactionsCollection(): Promise<Collection<Transactio
 
     if (!transactionsIndexEnsured) {
         await collection.createIndex({ userId: 1, restaurantId: 1 })
+        await collection.createIndex({ orderId: 1 }, { unique: true, sparse: true })
         transactionsIndexEnsured = true
     }
 

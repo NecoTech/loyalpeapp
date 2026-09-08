@@ -1,71 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hanken_Grotesk } from 'next/font/google'
-import { Sparkles, User, Receipt, QrCode, ChevronRight, PiggyBank } from 'lucide-react'
+import { Plus_Jakarta_Sans } from 'next/font/google'
+import {
+    MapPin,
+    ArrowRight,
+    Star,
+    Heart,
+    PiggyBank,
+    Receipt,
+    QrCode,
+    Search,
+    X,
+    User,
+} from 'lucide-react'
 import { useAuth } from './context/AuthContext'
+import { useLocation, CITIES } from './context/LocationContext'
+import { hasSeenOnboarding } from '../../lib/onboarding'
 import { cn } from '../../lib/utils'
-import ShaderBackground from './components/ShaderBackground'
 
-const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '700', '800'] })
-
-// Organic, mouse-reactive noise blend of the app's surface/primary/lavender
-// palette — ported directly from the mockup's WebGL shader (a softer, wider
-// flow than the loyalty page's variant: lower frequency, slower drift).
-const HOME_SHADER_FRAGMENT_SOURCE = `precision highp float;
-varying vec2 v_texCoord;
-uniform float u_time;
-uniform vec2 u_resolution;
-uniform vec2 u_mouse;
-
-vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-
-float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy) );
-    vec2 x0 = v -   i + dot(i, C.xx);
-    vec2 i1;
-    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod289(i);
-    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-    m = m*m ;
-    m = m*m ;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-    vec3 g;
-    g.x  = a0.x  * x0.x  + h.x  * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-}
-
-void main() {
-    vec2 uv = v_texCoord;
-    vec2 mouse = u_mouse / u_resolution;
-
-    float n1 = snoise(uv * 1.5 + u_time * 0.08);
-    float n2 = snoise(uv * 3.0 - u_time * 0.04 + mouse * 0.2);
-
-    vec3 colorBase = vec3(0.98, 0.98, 0.95);
-    vec3 colorPrimary = vec3(0.54, 0.81, 0.94);
-    vec3 colorAccent = vec3(0.88, 0.82, 0.96);
-
-    float mixVal = smoothstep(-0.6, 0.6, n1 + n2 * 0.5);
-    vec3 finalColor = mix(colorBase, mix(colorPrimary, colorAccent, n2 * 0.5 + 0.5), mixVal * 0.35);
-
-    float highlight = pow(max(0.0, snoise(uv * 8.0 + u_time * 0.15)), 12.0) * 0.12;
-    finalColor += highlight;
-
-    gl_FragColor = vec4(finalColor, 1.0);
-}`
+const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
 function getInitials(name?: string) {
     if (!name) return null
@@ -83,8 +38,15 @@ function formatCurrency(amount: number) {
 
 export default function Home() {
     const router = useRouter()
-    const { user } = useAuth()
+    const { user, isInitialized } = useAuth()
+    const { selectedCity, setSelectedCity } = useLocation()
     const [totalSaved, setTotalSaved] = useState(0)
+    const [readyToRender, setReadyToRender] = useState(false)
+
+    const [isCityModalOpen, setIsCityModalOpen] = useState(false)
+    const [isCitySheetVisible, setIsCitySheetVisible] = useState(false)
+    const [citySearch, setCitySearch] = useState('')
+    const searchInputRef = useRef<HTMLInputElement>(null)
 
     const requireAuth = (redirectPath: string) => {
         if (user) return true
@@ -93,6 +55,15 @@ export default function Home() {
     }
 
     const initials = getInitials(user?.fullname)
+
+    useEffect(() => {
+        if (!isInitialized) return
+        if (!user && !hasSeenOnboarding()) {
+            router.replace('/onboarding')
+            return
+        }
+        setReadyToRender(true)
+    }, [user, isInitialized, router])
 
     useEffect(() => {
         const userId = user?.email || user?.phoneNumber
@@ -113,118 +84,279 @@ export default function Home() {
         fetchSavings()
     }, [user?.email, user?.phoneNumber])
 
-    return (
-        <div className={cn(hankenGrotesk.className, "min-h-screen flex flex-col w-full max-w-md mx-auto relative overflow-x-hidden bg-[#fbf9f2] text-[#1b1c18]")}>
-            <ShaderBackground fragmentSource={HOME_SHADER_FRAGMENT_SOURCE} />
+    const openCityModal = () => {
+        setIsCityModalOpen(true)
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsCitySheetVisible(true)))
+    }
 
-            {/* Main Content */}
-            <main className="relative flex-1 px-6 pt-6 pb-[100px] flex flex-col gap-8">
-                {/* Hero Headline */}
-                <section className="flex items-start">
-                    <h1 className="text-[48px] leading-[52px] tracking-[-0.04em] font-extrabold text-[#1b1c18] max-w-[280px]">
-                        loyalpe
-                    </h1>
-                    <div className="mt-2 ml-1 text-[#67558c]">
-                        <Sparkles size={32} fill="currentColor" />
+    const closeCityModal = () => {
+        setIsCitySheetVisible(false)
+        setTimeout(() => {
+            setIsCityModalOpen(false)
+            setCitySearch('')
+        }, 200)
+    }
+
+    const selectCity = (name: string) => {
+        setSelectedCity(name)
+        closeCityModal()
+    }
+
+    useEffect(() => {
+        if (!isCityModalOpen) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeCityModal()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [isCityModalOpen])
+
+    useEffect(() => {
+        if (isCitySheetVisible) searchInputRef.current?.focus()
+    }, [isCitySheetVisible])
+
+    const filteredCities = CITIES.filter(city =>
+        city.name.toLowerCase().includes(citySearch.trim().toLowerCase())
+    )
+
+    if (!readyToRender) {
+        return <div className="min-h-screen bg-[#FAF7F0]" />
+    }
+
+    return (
+        <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col w-full max-w-[428px] mx-auto relative bg-[#FAF7F0] text-[#1c1b1b] pb-32 selection:bg-[#f6bf22] selection:text-[#1c1b1b]")}>
+            {/* Top Navigation App Bar */}
+            <header className="w-full px-4 pt-4 pb-3 flex items-center justify-between sticky top-0 bg-[#FAF7F0]/95 backdrop-blur-sm z-30">
+                <span className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
+                    loyalpe
+                </span>
+                <button
+                    onClick={openCityModal}
+                    aria-label="Select Location"
+                    className="h-10 px-3 rounded-full bg-white neo-border neo-shadow-1 flex items-center gap-1.5 text-[#111111] active-press transition-transform cursor-pointer hover:bg-[#f0edec]"
+                >
+                    <MapPin size={18} className="text-[#0040e0]" />
+                    <span className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold uppercase text-[#111111]">
+                        {selectedCity}
+                    </span>
+                </button>
+            </header>
+
+            {/* Main Content Canvas */}
+            <main className="flex-1 px-4 flex flex-col gap-6 mt-1">
+                {/* Hero Banner: "Find More Rewards" */}
+                <section
+                    onClick={() => router.push('/restaurants')}
+                    className="w-full bg-[#70D6FF] neo-border rounded-2xl neo-shadow-2 p-5 relative overflow-hidden active-press-lg transition-transform cursor-pointer"
+                >
+                    <div className="flex justify-between items-start mb-3">
+                        <span className="px-2.5 py-1 bg-[#f6bf22] text-[#1c1b1b] text-[11px] leading-[14px] tracking-[0.04em] font-extrabold uppercase neo-border rounded-full neo-shadow-badge">
+                            Exclusive
+                        </span>
+                        <div className="flex items-center gap-1 text-[13px] leading-[16px] tracking-[0.03em] font-extrabold text-[#111111] hover:underline">
+                            <span>See More</span>
+                            <ArrowRight size={16} />
+                        </div>
+                    </div>
+                    <div className="relative z-10 max-w-[210px]">
+                        <h2 className="text-2xl leading-[30px] tracking-[-0.02em] font-extrabold text-[#111111] mb-1">
+                            Find More Rewards
+                        </h2>
+                        <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#111111]/80">
+                            Discover exclusive partner cards &amp; perks
+                        </p>
+                    </div>
+                    {/* Decorative Neo Graphic Stamps */}
+                    <div className="absolute -right-3 -bottom-5 w-32 h-32 pointer-events-none opacity-90 rotate-[-8deg]">
+                        <div className="w-24 h-28 bg-[#FFC72C] neo-border rounded-xl neo-shadow-1 absolute top-2 right-2 flex flex-col p-2 justify-between">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[9px] font-extrabold bg-[#111111] text-white px-1 rounded">VIP</span>
+                                <Star size={14} fill="currentColor" />
+                            </div>
+                            <div className="h-2 w-12 bg-[#111111]/20 rounded" />
+                            <div className="w-full h-7 bg-white neo-border rounded flex items-center justify-center">
+                                <span className="text-[10px] text-[#111111] font-black">20% OFF</span>
+                            </div>
+                        </div>
+                        <div className="w-20 h-24 bg-[#FF5A36] neo-border rounded-xl neo-shadow-badge absolute bottom-0 left-0 rotate-[18deg] flex flex-col p-1.5 justify-between">
+                            <Heart size={16} className="text-white" fill="currentColor" />
+                            <div className="w-6 h-6 bg-white rounded-full mx-auto neo-border flex items-center justify-center">
+                                <span className="text-[9px] font-black">★</span>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                {/* Balance Card */}
-                <section className="rounded-3xl p-6 min-h-[260px] flex items-center relative overflow-hidden shadow-sm backdrop-blur-md border border-white/20 bg-[#89cff0]">
-                    <div className="flex justify-between items-start relative z-10 gap-4 w-full">
-                        <div className="flex flex-col gap-1">
-                            <h2 className="text-[#1b1c18] text-[30px] leading-tight font-extrabold tracking-tighter">Find More Rewards</h2>
-                            <p className="text-[#40484d] text-sm font-medium opacity-80">Discover exclusive partner cards</p>
+                {/* Saved Money Section */}
+                <section className="w-full bg-white neo-border rounded-2xl neo-shadow-2 p-5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-xl bg-[#f6bf22] neo-border neo-shadow-badge flex items-center justify-center text-[#111111]">
+                                <PiggyBank size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Saved Money</h3>
+                                <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656]">Total earned via rewards &amp; discounts</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-baseline justify-between pt-1 border-t-2 border-dashed border-[#111111]/15 mt-1">
+                        <div className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
+                            {formatCurrency(totalSaved)}
                         </div>
                         <button
-                            onClick={() => router.push('/restaurants')}
-                            className="flex items-center gap-1 font-bold hover:opacity-80 transition-opacity text-[#0d6683] shrink-0"
+                            onClick={() => requireAuth('/transactions') && router.push('/transactions')}
+                            className="px-3.5 py-1.5 bg-[#FAF7F0] hover:bg-[#ffdf99] neo-border rounded-full neo-shadow-badge text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold flex items-center gap-1 active-press transition-all cursor-pointer"
                         >
-                            <span className="text-[12px] tracking-widest uppercase">See More</span>
-                            <ChevronRight size={18} />
+                            <span>View History</span>
+                            <ArrowRight size={14} />
                         </button>
                     </div>
                 </section>
 
-                {/* Saved Money */}
-                <section className="rounded-3xl p-6 relative overflow-hidden shadow-sm backdrop-blur-md border border-white/20 bg-[#eae8e1]">
-                    <div className="flex flex-col gap-4 relative z-10">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col gap-1">
-                                <h2 className="text-[#1b1c18] text-[22px] font-extrabold tracking-tighter">Saved Money</h2>
-                                <p className="text-[#40484d] text-sm font-medium opacity-80">Total earned via rewards &amp; cashback</p>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-[#c2f050] flex items-center justify-center text-[#516b00] shrink-0">
-                                <PiggyBank size={20} />
-                            </div>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-[32px] font-extrabold tracking-tighter text-[#1b1c18]">
-                                {formatCurrency(totalSaved)}
-                            </span>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Action Cards Grid */}
-                <section className="grid grid-cols-2 gap-3 h-48">
+                {/* Quick Action 2-Column Bento Grid */}
+                <section className="grid grid-cols-2 gap-4">
                     {/* Profile */}
                     <button
                         onClick={() => requireAuth('/profile') && router.push('/profile')}
-                        className="rounded-3xl p-5 flex flex-col justify-center items-center text-center relative overflow-hidden group hover:opacity-95 hover:scale-105 hover:brightness-110 transition-all backdrop-blur-md shadow-lg border border-white/20 bg-[#d1bbfa]"
+                        className="bg-[#D8B4FE] neo-border rounded-2xl neo-shadow-2 p-4 flex flex-col justify-between min-h-[145px] active-press-lg transition-transform cursor-pointer text-left"
                     >
-                        <div className="flex flex-col items-center justify-center gap-2 relative z-10">
-                            <div className="w-10 h-10 rounded-full bg-[#5a487f] text-white flex items-center justify-center border-2 border-[#5a487f]/20">
-                                {initials ? (
-                                    <span className="text-sm font-bold">{initials}</span>
-                                ) : (
-                                    <User size={20} />
-                                )}
+                        <div className="flex justify-between items-start">
+                            <div className="w-11 h-11 rounded-full bg-[#111111] text-white flex items-center justify-center text-[17px] font-extrabold neo-shadow-badge border-2 border-white">
+                                {initials ? initials : <User size={20} />}
                             </div>
-                            <span className="text-[#000000] text-[22px] leading-tight font-bold">Profile</span>
+                        </div>
+                        <div className="mt-3">
+                            <h4 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Profile</h4>
+                            <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#111111]/80">Account</p>
                         </div>
                     </button>
 
                     {/* Transactions */}
                     <button
                         onClick={() => requireAuth('/transactions') && router.push('/transactions')}
-                        className="rounded-3xl p-5 flex flex-col justify-center items-center text-center relative overflow-hidden group hover:opacity-95 hover:scale-105 hover:brightness-110 transition-all backdrop-blur-md shadow-lg border border-white/20 bg-[#c2f050]"
+                        className="bg-[#BEF264] neo-border rounded-2xl neo-shadow-2 p-4 flex flex-col justify-between min-h-[145px] active-press-lg transition-transform cursor-pointer text-left"
                     >
-                        <div className="flex flex-col items-center justify-center gap-2 relative z-10">
-                            <Receipt size={32} className="text-[#516b00]" />
-                            <span className="text-[#000000] text-[22px] leading-tight font-bold">Transaction</span>
+                        <div className="flex justify-between items-start">
+                            <div className="w-11 h-11 rounded-xl bg-white neo-border flex items-center justify-center neo-shadow-badge text-[#111111]">
+                                <Receipt size={24} />
+                            </div>
+                            <span className="w-3 h-3 bg-[#fd5835] neo-border border-[1.5px] rounded-full" />
+                        </div>
+                        <div className="mt-3">
+                            <h4 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Transaction</h4>
+                            <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#111111]/80">history</p>
                         </div>
                     </button>
                 </section>
             </main>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex fixed top-0 right-6 h-16 items-center gap-6 z-50">
-                <span className="text-[#1b1c18] font-bold">Home</span>
+            {/* Docked Neo-Brutalist Bottom Navigation */}
+            <div className="fixed bottom-6 left-0 right-0 max-w-[428px] mx-auto px-4 z-30 pointer-events-none flex justify-center">
                 <button
-                    onClick={() => requireAuth('/transactions') && router.push('/transactions')}
-                    className="text-[#40484d] hover:opacity-80 transition-opacity"
+                    onClick={() => router.push('/scan')}
+                    className="pointer-events-auto w-full bg-[#FFC72C] neo-border neo-shadow-2 rounded-2xl py-3 px-4 flex items-center justify-center gap-2 text-[#111111] text-[17px] leading-[22px] tracking-[-0.01em] font-bold active-press-lg transition-transform cursor-pointer"
                 >
-                    Payments
-                </button>
-                <button
-                    onClick={() => requireAuth('/profile') && router.push('/profile')}
-                    className="text-[#40484d] hover:opacity-80 transition-opacity"
-                >
-                    Settings
+                    <QrCode size={24} />
+                    <span>Scan QR Code</span>
                 </button>
             </div>
 
-            {/* Floating QR Scan Button */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-                <button
-                    aria-label="Scan to order"
-                    onClick={() => router.push('/scan')}
-                    className="w-16 h-16 bg-[#c2f050]/90 backdrop-blur-md text-[#516b00] rounded-full shadow-[0_0_20px_rgba(197,242,83,0.5)] border border-white/30 flex items-center justify-center hover:opacity-95 transition-opacity active:scale-95"
+            {/* City Selection Modal */}
+            {isCityModalOpen && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="city-modal-title"
+                    className={cn(
+                        "fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-[2px] transition-opacity duration-200",
+                        isCitySheetVisible ? "opacity-100" : "opacity-0"
+                    )}
                 >
-                    <QrCode size={32} />
-                </button>
-            </div>
+                    <div className="absolute inset-0 cursor-pointer" onClick={closeCityModal} />
+                    <div
+                        className={cn(
+                            "relative w-full max-w-[428px] mx-auto bg-[#FAF7F0] border-t-4 border-x-2 border-[#111111] rounded-t-[28px] shadow-2xl px-5 pt-4 pb-8 transform transition-transform duration-200 max-h-[85vh] flex flex-col z-10",
+                            isCitySheetVisible ? "translate-y-0" : "translate-y-full"
+                        )}
+                    >
+                        <div className="w-12 h-1.5 bg-[#111111]/30 rounded-full mx-auto mb-4" />
+                        <div className="flex items-center justify-between mb-4 pb-2 border-b-2 border-[#111111]/10">
+                            <div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-[#434656]">Pick Location</span>
+                                <h2 id="city-modal-title" className="text-xl leading-[26px] tracking-[-0.015em] font-bold text-[#111111]">Select your city</h2>
+                            </div>
+                            <button
+                                aria-label="Close city modal"
+                                onClick={closeCityModal}
+                                className="w-10 h-10 bg-white border-2 border-[#111111] rounded-full neo-shadow-badge flex items-center justify-center active:translate-x-0.5 active:translate-y-0.5 hover:bg-zinc-100 transition-all text-[#111111] cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="relative mb-3.5">
+                            <input
+                                ref={searchInputRef}
+                                value={citySearch}
+                                onChange={e => setCitySearch(e.target.value)}
+                                placeholder="Search city or area..."
+                                className="w-full bg-white text-[#111111] placeholder:text-zinc-500 font-bold text-sm py-3 pl-11 pr-4 border-2 border-[#111111] rounded-xl neo-shadow-badge focus:outline-none focus:ring-0 focus:border-[#111111] transition-all"
+                            />
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#111111] pointer-events-none flex items-center">
+                                <Search size={20} />
+                            </span>
+                        </div>
+                        <div className="overflow-y-auto no-scrollbar space-y-3 flex-1 pr-0.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black uppercase tracking-wider text-[#111111]">Popular Cities</span>
+                                <span className="text-[11px] font-bold text-[#434656]">{CITIES.length} available</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {filteredCities.map(city => {
+                                    const isActive = city.name === selectedCity
+                                    return (
+                                        <button
+                                            key={city.name}
+                                            type="button"
+                                            onClick={() => selectCity(city.name)}
+                                            className={cn(
+                                                "bg-white hover:bg-zinc-50 border-2 border-[#111111] rounded-xl p-2.5 flex items-center gap-2.5 neo-shadow-badge active:translate-x-0.5 active:translate-y-0.5 transition-all text-left cursor-pointer",
+                                                isActive && "ring-2 ring-[#111111]"
+                                            )}
+                                        >
+                                            <span
+                                                className="w-8 h-8 rounded-lg border-2 border-[#111111] flex items-center justify-center font-black text-xs text-[#111111] shrink-0"
+                                                style={{ backgroundColor: city.color }}
+                                            >
+                                                {city.code}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-black text-[#111111] truncate flex items-center justify-between">
+                                                    <span>{city.name}</span>
+                                                    {isActive && (
+                                                        <span
+                                                            className="w-2 h-2 rounded-full border border-[#111111] inline-block"
+                                                            style={{ backgroundColor: city.color }}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] font-bold text-[#434656] truncate">
+                                                    {isActive ? 'Active City' : `${city.count}+ Spots`}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            {filteredCities.length === 0 && (
+                                <div className="py-6 text-center">
+                                    <p className="text-xs font-black text-[#434656]">No cities found matching your search</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

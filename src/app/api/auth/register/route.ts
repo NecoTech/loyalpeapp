@@ -5,7 +5,7 @@ import { getUsersCollection } from '../../../../../lib/mongodb'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: Request) {
-    let body: { email?: string; password?: string; fullname?: string }
+    let body: { email?: string; password?: string; fullname?: string; phoneNumber?: string }
     try {
         body = await request.json()
     } catch {
@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     const email = body.email?.trim().toLowerCase()
     const password = body.password
     const fullname = body.fullname?.trim()
+    const phoneNumber = body.phoneNumber?.trim()
 
     if (!email || !EMAIL_REGEX.test(email)) {
         return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
@@ -36,12 +37,13 @@ export async function POST(request: Request) {
             email,
             passwordHash,
             fullname,
+            phoneNumber,
             createdAt: new Date(),
         })
 
         return NextResponse.json({
             success: true,
-            user: { email, fullname: fullname || email, phoneNumber: '' },
+            user: { email, fullname: fullname || email, phoneNumber: phoneNumber || '' },
         }, { status: 201 })
     } catch (error: any) {
         if (error?.code === 11000) {

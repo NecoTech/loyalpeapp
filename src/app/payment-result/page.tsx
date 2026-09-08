@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -258,8 +258,14 @@ function PaymentResultContent() {
 // Main component wrapped with CartProvider
 export default function PaymentResult() {
     return (
-        <CartProvider>
-            <PaymentResultContent />
-        </CartProvider>
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-900">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+            </div>
+        }>
+            <CartProvider>
+                <PaymentResultContent />
+            </CartProvider>
+        </Suspense>
     );
 }

@@ -11,6 +11,7 @@ import FloatingCartIcon from '..//../components/FloatingCartIcon'
 import Login from '..//../components/Login'
 // import Register from '..//../components/Register'
 import { cn } from '..//..//..//..//lib/utils'
+import { secureFetch } from '..//..//..//..//lib/secureFetch'
 import { PulseLoader } from "react-spinners";
 import { Search } from 'lucide-react'
 
@@ -42,10 +43,9 @@ function RestaurantContent() {
             // Validate restaurant ID before navigating
             setIsValidatingRestaurant(true);
             try {
-                const response = await fetch(`/api/restaurant/${normalizedRestaurantId}`);
-                const data = await response.json();
+                const { res: response, data } = await secureFetch(`/api/restaurant/${normalizedRestaurantId}`);
 
-                if (!response.ok || !data.success || !data.restaurant) {
+                if (!response.ok || !data?.success || !data.restaurant) {
                     // Restaurant not found, show error and stay on the same page
                     // setError(`Restaurant ID "${normalizedRestaurantId}" not found. Please try again.`);
                     setIsValidatingRestaurant(false);
@@ -80,10 +80,9 @@ function RestaurantContent() {
             }
 
             try {
-                const response = await fetch(`/api/restaurant/${id}`)
-                const data = await response.json()
+                const { res: response, data } = await secureFetch(`/api/restaurant/${id}`)
 
-                if (!response.ok || !data.success || !data.restaurant) {
+                if (!response.ok || !data?.success || !data.restaurant) {
                     setRestaurantNotFound(true)
                     throw new Error('Restaurant not found')
                 }

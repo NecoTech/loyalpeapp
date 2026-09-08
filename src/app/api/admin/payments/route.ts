@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getTransactionsCollection } from '../../../../../lib/mongodb'
 
 const MAX_RESULTS = 500
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const endDateParam = searchParams.get('endDate')
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     const query: Record<string, unknown> = { restaurantId }
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         if (startDateParam) {
             const start = new Date(startDateParam)
             if (isNaN(start.getTime())) {
-                return NextResponse.json({ success: false, error: 'Invalid startDate.' }, { status: 400 })
+                return encryptedJson({ success: false, error: 'Invalid startDate.' }, { status: 400 })
             }
             // startDateParam is a date-only string ("YYYY-MM-DD"), which the
             // Date constructor parses as UTC midnight — use the UTC setter
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         if (endDateParam) {
             const end = new Date(endDateParam)
             if (isNaN(end.getTime())) {
-                return NextResponse.json({ success: false, error: 'Invalid endDate.' }, { status: 400 })
+                return encryptedJson({ success: false, error: 'Invalid endDate.' }, { status: 400 })
             }
             end.setUTCHours(23, 59, 59, 999)
             createdAt.$lte = end
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
         const totalAmount = transactions.reduce((sum, t) => sum + (t.finalAmount || 0), 0)
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             totalAmount,
             count: transactions.length,
@@ -68,6 +68,6 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('Get admin payments error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

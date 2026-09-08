@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import bcrypt from 'bcryptjs'
 import { getUsersCollection } from '../../../../../lib/mongodb'
 
@@ -7,9 +7,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export async function POST(request: Request) {
     let body: { email?: string; password?: string; fullname?: string; phoneNumber?: string }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const email = body.email?.trim().toLowerCase()
@@ -18,10 +18,10 @@ export async function POST(request: Request) {
     const phoneNumber = body.phoneNumber?.trim()
 
     if (!email || !EMAIL_REGEX.test(email)) {
-        return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
     }
     if (!password || password.length < 6) {
-        return NextResponse.json({ success: false, error: 'Password must be at least 6 characters.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Password must be at least 6 characters.' }, { status: 400 })
     }
 
     try {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
         const existing = await users.findOne({ email })
         if (existing) {
-            return NextResponse.json({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
+            return encryptedJson({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
         }
 
         const passwordHash = await bcrypt.hash(password, 10)
@@ -41,15 +41,15 @@ export async function POST(request: Request) {
             createdAt: new Date(),
         })
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             user: { email, fullname: fullname || email, phoneNumber: phoneNumber || '' },
         }, { status: 201 })
     } catch (error: any) {
         if (error?.code === 11000) {
-            return NextResponse.json({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
+            return encryptedJson({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
         }
         console.error('Register error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

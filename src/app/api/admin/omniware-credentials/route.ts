@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getOmniwareCredentialsCollection } from '../../../../../lib/mongodb'
 
 function maskApiKey(apiKey: string) {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const restaurantId = searchParams.get('restaurantId')?.trim().toLowerCase()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     try {
@@ -19,11 +19,11 @@ export async function GET(request: Request) {
         const credentials = await collection.findOne({ restaurantId })
 
         if (!credentials) {
-            return NextResponse.json({ success: true, configured: false })
+            return encryptedJson({ success: true, configured: false })
         }
 
         // Never return the salt or full API key to the browser.
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             configured: true,
             apiKeyMasked: maskApiKey(credentials.apiKey),
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('Get Omniware credentials error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }
 
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
         paymentOptions?: string
     }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const restaurantId = body.restaurantId?.trim().toLowerCase()
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const salt = body.salt?.trim()
 
     if (!restaurantId || !apiKey || !salt) {
-        return NextResponse.json({ success: false, error: 'restaurantId, apiKey, and salt are required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId, apiKey, and salt are required.' }, { status: 400 })
     }
 
     const mode = body.mode === 'TEST' ? 'TEST' : 'LIVE'
@@ -81,9 +81,9 @@ export async function POST(request: Request) {
             { upsert: true }
         )
 
-        return NextResponse.json({ success: true })
+        return encryptedJson({ success: true })
     } catch (error) {
         console.error('Save Omniware credentials error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

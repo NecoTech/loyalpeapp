@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'] })
@@ -123,9 +124,8 @@ export default function TransactionsPage() {
         const fetchTransactions = async () => {
             setIsLoading(true)
             try {
-                const res = await fetch(`/api/loyalty/transactions?userId=${encodeURIComponent(userId)}`)
-                const data = await res.json()
-                if (data.success) {
+                const { data } = await secureFetch(`/api/loyalty/transactions?userId=${encodeURIComponent(userId)}`)
+                if (data?.success) {
                     setTransactions(data.transactions)
                 }
             } catch (err) {

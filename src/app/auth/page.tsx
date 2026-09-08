@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
@@ -194,16 +195,14 @@ function AuthContent() {
 
         setIsRequestingReset(true)
         try {
-            const res = await fetch('/api/auth/forgot-password', {
+            const { data } = await secureFetch('/api/auth/forgot-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: loginEmail.trim() }),
+                body: { email: loginEmail.trim() },
             })
-            const data = await res.json()
-            if (data.success) {
+            if (data?.success) {
                 showToast('CHECK YOUR EMAIL', "If that email has an account, we've sent a reset link.")
             } else {
-                showToast('SOMETHING WENT WRONG', data.error || 'Please try again.')
+                showToast('SOMETHING WENT WRONG', data?.error || 'Please try again.')
             }
         } catch (err) {
             console.error('Forgot password request failed', err)

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
 
 export async function GET(request: Request, { params }: { params: Promise<{ restaurantId: string }> }) {
@@ -6,7 +6,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ rest
     const normalizedId = restaurantId?.trim().toLowerCase()
 
     if (!normalizedId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     try {
@@ -14,10 +14,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ rest
         const owner = await owners.findOne({ restaurantId: normalizedId })
 
         if (!owner) {
-            return NextResponse.json({ success: false, error: 'Restaurant not found.' }, { status: 404 })
+            return encryptedJson({ success: false, error: 'Restaurant not found.' }, { status: 404 })
         }
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             restaurant: {
                 id: normalizedId,
@@ -29,6 +29,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ rest
         })
     } catch (error) {
         console.error('Get restaurant details error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

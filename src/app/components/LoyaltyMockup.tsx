@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ArrowLeft, Home, X, CreditCard, Store, Delete, Check, ChevronDown, Gift, QrCode, AlertTriangle, Loader2, BadgeCheck, Star, Sparkles, Cake } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 import { useAuth } from '../context/AuthContext'
 import Image from "next/image"
 
@@ -172,10 +173,9 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     useEffect(() => {
         const fetchRestaurant = async () => {
             try {
-                const res = await fetch(`/api/restaurant/${restaurantId}`)
+                const { res, data } = await secureFetch(`/api/restaurant/${restaurantId}`)
                 if (!res.ok) return
-                const data = await res.json()
-                if (!data.success || !data.restaurant) return
+                if (!data?.success || !data.restaurant) return
 
                 setRestaurant(data.restaurant)
             } catch (err) {
@@ -195,9 +195,8 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
         const fetchActiveReward = async () => {
             try {
-                const res = await fetch(`/api/loyalty/active-reward?restaurantId=${restaurantId}&userId=${encodeURIComponent(userId)}`)
-                const data = await res.json()
-                if (!data.success) return
+                const { data } = await secureFetch(`/api/loyalty/active-reward?restaurantId=${restaurantId}&userId=${encodeURIComponent(userId)}`)
+                if (!data?.success) return
                 setLoyaltyCardId(data.card?.id ?? null)
                 setActiveItem(data.activeItem)
             } catch (err) {
@@ -218,9 +217,8 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             try {
                 const searchParams = new URLSearchParams({ restaurantId })
                 if (userId) searchParams.set('userId', userId)
-                const res = await fetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
-                const data = await res.json()
-                if (res.ok && data.success) {
+                const { res, data } = await secureFetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
+                if (res.ok && data?.success) {
                     setAllCards((data.cards as LoyaltyCard[]).filter(c => c.items.length > 0))
                 }
             } catch (err) {
@@ -278,20 +276,18 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
         setIsPaying(true)
         try {
-            const res = await fetch('/api/loyalty/redeem', {
+            const { data } = await secureFetch('/api/loyalty/redeem', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: {
                     userId,
                     restaurantId,
                     cardId: loyaltyCardId || undefined,
                     itemId: redeemedItem?.id,
                     amount: numericAmount,
                     orderId,
-                }),
+                },
             })
-            const data = await res.json()
-            if (!data.success) {
+            if (!data?.success) {
                 console.error('Payment failed:', data.error)
                 return
             }
@@ -313,9 +309,8 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                 setSuccessItemId(redeemedItem?.id ?? null)
                 try {
                     const searchParams = new URLSearchParams({ restaurantId, userId })
-                    const cardsRes = await fetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
-                    const cardsData = await cardsRes.json()
-                    if (cardsRes.ok && cardsData.success) {
+                    const { res: cardsRes, data: cardsData } = await secureFetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
+                    if (cardsRes.ok && cardsData?.success) {
                         setAllCards((cardsData.cards as LoyaltyCard[]).filter(c => c.items.length > 0))
                     }
                 } catch (err) {

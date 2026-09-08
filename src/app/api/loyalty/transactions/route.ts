@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getTransactionsCollection, getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
 
 export async function GET(request: Request) {
@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     const userId = searchParams.get('userId')?.trim().toLowerCase()
 
     if (!userId) {
-        return NextResponse.json({ success: false, error: 'userId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'userId is required.' }, { status: 400 })
     }
 
     try {
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
             : []
         const nameByRestaurantId = new Map(ownerDocs.map(o => [o.restaurantId, o.restaurantName || o.restaurantId]))
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             transactions: results.map(t => ({
                 id: t._id.toString(),
@@ -61,6 +61,6 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('List transactions error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

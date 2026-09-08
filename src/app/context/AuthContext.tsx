@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { encrypt, decrypt } from '..//..//..//lib/encryption' // Import your encryption utilities
+import { secureFetch } from '../../../lib/secureFetch'
 
 type User = {
   fullname: string
@@ -88,14 +89,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullname?: string, phoneNumber?: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/register', {
+      const { res, data } = await secureFetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullname, phoneNumber }),
+        body: { email, password, fullname, phoneNumber },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to create account.' }
       }
 
@@ -109,14 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/login', {
+      const { res, data } = await secureFetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to sign in.' }
       }
 
@@ -133,14 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Not signed in.' }
     }
     try {
-      const res = await fetch('/api/auth/profile', {
+      const { res, data } = await secureFetch('/api/auth/profile', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, ...updates }),
+        body: { email: user.email, ...updates },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to update profile.' }
       }
 
@@ -157,14 +152,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Not signed in.' }
     }
     try {
-      const res = await fetch('/api/auth/profile', {
+      const { res, data } = await secureFetch('/api/auth/profile', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email }),
+        body: { email: user.email },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to delete account.' }
       }
 

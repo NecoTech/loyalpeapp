@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
 
 /**
@@ -22,9 +22,9 @@ export async function GET() {
             counts[owner.city] = (counts[owner.city] || 0) + 1
         }
 
-        return NextResponse.json({ success: true, counts })
+        return encryptedJson({ success: true, counts })
     } catch (error) {
         console.error('City counts error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { redeemLoyaltyReward } from '../../../../../lib/loyalty'
 
 export async function POST(request: Request) {
@@ -11,9 +11,9 @@ export async function POST(request: Request) {
         orderId?: string
     }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const userId = body.userId?.trim().toLowerCase()
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const amount = Number(body.amount)
 
     if (!userId || !restaurantId) {
-        return NextResponse.json({ success: false, error: 'userId and restaurantId are required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'userId and restaurantId are required.' }, { status: 400 })
     }
 
     try {
@@ -35,10 +35,10 @@ export async function POST(request: Request) {
         })
 
         if (!result.success) {
-            return NextResponse.json({ success: false, error: result.error }, { status: result.status })
+            return encryptedJson({ success: false, error: result.error }, { status: result.status })
         }
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             transaction: result.transaction,
             nextCard: result.nextCard,
@@ -46,6 +46,6 @@ export async function POST(request: Request) {
         })
     } catch (error) {
         console.error('Redeem loyalty reward error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

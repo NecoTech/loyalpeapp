@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../../../lib/apiCrypto'
 import { ObjectId } from 'mongodb'
 import { getLoyaltyCardsCollection } from '../../../../../../../lib/mongodb'
 
@@ -14,9 +14,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ car
         freeItemName?: string
     }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const restaurantId = body.restaurantId?.trim().toLowerCase()
@@ -24,16 +24,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ car
     const rewardType = body.rewardType
 
     if (!ObjectId.isValid(cardId)) {
-        return NextResponse.json({ success: false, error: 'Invalid card id.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid card id.' }, { status: 400 })
     }
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
     if (!Number.isInteger(stampsRequired) || stampsRequired < 1 || stampsRequired > 100) {
-        return NextResponse.json({ success: false, error: 'Stamps required must be a whole number between 1 and 100.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Stamps required must be a whole number between 1 and 100.' }, { status: 400 })
     }
     if (rewardType !== 'discount' && rewardType !== 'freeItem') {
-        return NextResponse.json({ success: false, error: 'Reward type must be either a discount or a free item.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Reward type must be either a discount or a free item.' }, { status: 400 })
     }
 
     const item: {
@@ -53,14 +53,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ car
         const discountType = body.discountType === 'flat' ? 'flat' : 'percentage'
         const discountValue = Number(body.discountValue)
         if (!Number.isFinite(discountValue) || discountValue <= 0) {
-            return NextResponse.json({ success: false, error: 'Enter a valid discount value.' }, { status: 400 })
+            return encryptedJson({ success: false, error: 'Enter a valid discount value.' }, { status: 400 })
         }
         item.discountType = discountType
         item.discountValue = discountValue
     } else {
         const freeItemName = body.freeItemName?.trim()
         if (!freeItemName) {
-            return NextResponse.json({ success: false, error: 'Enter the name of the free item.' }, { status: 400 })
+            return encryptedJson({ success: false, error: 'Enter the name of the free item.' }, { status: 400 })
         }
         item.freeItemName = freeItemName
     }
@@ -73,10 +73,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ car
         )
 
         if (result.matchedCount === 0) {
-            return NextResponse.json({ success: false, error: 'Card not found.' }, { status: 404 })
+            return encryptedJson({ success: false, error: 'Card not found.' }, { status: 404 })
         }
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             item: {
                 id: item._id.toString(),
@@ -89,6 +89,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ car
         }, { status: 201 })
     } catch (error) {
         console.error('Add loyalty reward item error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

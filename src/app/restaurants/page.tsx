@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Search, Store, X } from 'lucide-react'
 import { useLocation, useCityCounts, CITIES } from '../context/LocationContext'
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '700', '800'] })
 
@@ -72,9 +73,8 @@ export default function RestaurantsPage() {
         const fetchRestaurants = async () => {
             setIsLoading(true)
             try {
-                const res = await fetch(`/api/restaurants?city=${encodeURIComponent(selectedCity)}`)
-                const data = await res.json()
-                if (data.success) setRestaurants(data.restaurants)
+                const { data } = await secureFetch(`/api/restaurants?city=${encodeURIComponent(selectedCity)}`)
+                if (data?.success) setRestaurants(data.restaurants)
             } catch (err) {
                 console.error('Failed to load restaurants', err)
             } finally {

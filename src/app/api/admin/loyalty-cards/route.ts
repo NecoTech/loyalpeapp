@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getLoyaltyCardsCollection } from '../../../../../lib/mongodb'
 
 export async function GET(request: Request) {
@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     const restaurantId = searchParams.get('restaurantId')?.trim().toLowerCase()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     try {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
             .sort({ createdAt: -1 })
             .toArray()
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             cards: results.map(card => ({
                 id: card._id.toString(),
@@ -34,26 +34,26 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('List loyalty cards error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }
 
 export async function POST(request: Request) {
     let body: { restaurantId?: string; name?: string }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const restaurantId = body.restaurantId?.trim().toLowerCase()
     const name = body.name?.trim()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
     if (!name) {
-        return NextResponse.json({ success: false, error: 'Card name is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Card name is required.' }, { status: 400 })
     }
 
     try {
@@ -66,12 +66,12 @@ export async function POST(request: Request) {
         }
         const result = await cards.insertOne(doc)
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             card: { id: result.insertedId.toString(), name, items: [], createdAt: doc.createdAt },
         }, { status: 201 })
     } catch (error) {
         console.error('Create loyalty card error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

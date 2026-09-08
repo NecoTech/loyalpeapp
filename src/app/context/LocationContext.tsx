@@ -13,6 +13,7 @@ import {
     type LucideIcon,
 } from 'lucide-react'
 import { normalizeCityName } from '../../../lib/cities'
+import { secureFetch } from '../../../lib/secureFetch'
 
 export type CityOption = {
     name: string
@@ -100,10 +101,9 @@ export function useCityCounts() {
 
     useEffect(() => {
         let cancelled = false
-        fetch('/api/restaurants/city-counts')
-            .then(res => res.json())
-            .then(data => {
-                if (!cancelled && data.success) setCounts(data.counts)
+        secureFetch('/api/restaurants/city-counts')
+            .then(({ data }) => {
+                if (!cancelled && data?.success) setCounts(data.counts)
             })
             .catch(error => console.error('Failed to load city counts', error))
         return () => {

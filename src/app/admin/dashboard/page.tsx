@@ -7,6 +7,7 @@ import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percen
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { KERALA_CITIES } from '../../../../lib/keralaCities'
 import { cn } from '../../../../lib/utils'
+import { secureFetch } from '../../../../lib/secureFetch'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['600'] })
@@ -159,9 +160,8 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
         setIsLoading(true)
         setError('')
         try {
-            const res = await fetch(`/api/admin/loyalty-cards?restaurantId=${encodeURIComponent(restaurantId)}`)
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to fetch loyalty cards')
+            const { res, data } = await secureFetch(`/api/admin/loyalty-cards?restaurantId=${encodeURIComponent(restaurantId)}`)
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to fetch loyalty cards')
             setCards(data.cards)
             setSelectedCardId(prev => prev ?? data.cards[0]?.id ?? null)
         } catch (err) {
@@ -231,13 +231,11 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
 
         setIsCreatingCard(true)
         try {
-            const res = await fetch('/api/admin/loyalty-cards', {
+            const { res, data } = await secureFetch('/api/admin/loyalty-cards', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ restaurantId, name: newCardName.trim() }),
+                body: { restaurantId, name: newCardName.trim() },
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to create card')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to create card')
 
             setCards(prev => [data.card, ...prev])
             setSelectedCardId(data.card.id)
@@ -253,11 +251,10 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
     const handleDeleteCard = async (cardId: string) => {
         setDeletingCardId(cardId)
         try {
-            const res = await fetch(`/api/admin/loyalty-cards/${cardId}?restaurantId=${encodeURIComponent(restaurantId)}`, {
+            const { res, data } = await secureFetch(`/api/admin/loyalty-cards/${cardId}?restaurantId=${encodeURIComponent(restaurantId)}`, {
                 method: 'DELETE',
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete card')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to delete card')
 
             setCards(prev => {
                 const next = prev.filter(c => c.id !== cardId)
@@ -294,13 +291,11 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
 
         setIsSavingCardName(true)
         try {
-            const res = await fetch(`/api/admin/loyalty-cards/${selectedCard.id}`, {
+            const { res, data } = await secureFetch(`/api/admin/loyalty-cards/${selectedCard.id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ restaurantId, name }),
+                body: { restaurantId, name },
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to rename card')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to rename card')
 
             setCards(prev => prev.map(c => c.id === selectedCard.id ? { ...c, name } : c))
             setIsEditingCardName(false)
@@ -345,13 +340,11 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
             const url = editingItemId
                 ? `/api/admin/loyalty-cards/${selectedCard.id}/items/${editingItemId}`
                 : `/api/admin/loyalty-cards/${selectedCard.id}/items`
-            const res = await fetch(url, {
+            const { res, data } = await secureFetch(url, {
                 method: editingItemId ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
+                body,
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save reward')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save reward')
 
             setCards(prev => prev.map(c => {
                 if (c.id !== selectedCard.id) return c
@@ -371,12 +364,11 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
         if (!selectedCard) return
         setDeletingItemId(itemId)
         try {
-            const res = await fetch(
+            const { res, data } = await secureFetch(
                 `/api/admin/loyalty-cards/${selectedCard.id}/items/${itemId}?restaurantId=${encodeURIComponent(restaurantId)}`,
                 { method: 'DELETE' }
             )
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete reward')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to delete reward')
 
             setCards(prev => prev.map(c => c.id === selectedCard.id ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c))
         } catch (err) {
@@ -745,9 +737,8 @@ function PaymentGatewaySettings({ restaurantId }: { restaurantId: string }) {
     const fetchCredentials = async () => {
         setIsLoading(true)
         try {
-            const res = await fetch(`/api/admin/omniware-credentials?restaurantId=${encodeURIComponent(restaurantId)}`)
-            const data = await res.json()
-            if (data.success && data.configured) {
+            const { data } = await secureFetch(`/api/admin/omniware-credentials?restaurantId=${encodeURIComponent(restaurantId)}`)
+            if (data?.success && data.configured) {
                 setConfigured(true)
                 setApiKeyMasked(data.apiKeyMasked)
                 setMode(data.mode)
@@ -782,10 +773,9 @@ function PaymentGatewaySettings({ restaurantId }: { restaurantId: string }) {
 
         setIsSaving(true)
         try {
-            const res = await fetch('/api/admin/omniware-credentials', {
+            const { res, data } = await secureFetch('/api/admin/omniware-credentials', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: {
                     restaurantId,
                     apiKey: apiKey.trim(),
                     salt: salt.trim(),
@@ -793,10 +783,9 @@ function PaymentGatewaySettings({ restaurantId }: { restaurantId: string }) {
                     paymentOptions,
                     gatewayUrl: gatewayUrl.trim(),
                     responseUrl: responseUrl.trim(),
-                }),
+                },
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save credentials')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save credentials')
 
             setSaved(true)
             setApiKey('')
@@ -935,9 +924,8 @@ function UpiUrlSettings({ restaurantId }: { restaurantId: string }) {
     const fetchUpiUrl = async () => {
         setIsLoading(true)
         try {
-            const res = await fetch(`/api/admin/upi-url?restaurantId=${encodeURIComponent(restaurantId)}`)
-            const data = await res.json()
-            if (data.success) {
+            const { data } = await secureFetch(`/api/admin/upi-url?restaurantId=${encodeURIComponent(restaurantId)}`)
+            if (data?.success) {
                 setUpiUrl(data.upiUrl || '')
                 setIsEditing(!data.upiUrl)
             }
@@ -961,13 +949,11 @@ function UpiUrlSettings({ restaurantId }: { restaurantId: string }) {
         const trimmedUrl = upiUrl.trim()
         setIsSaving(true)
         try {
-            const res = await fetch('/api/admin/upi-url', {
+            const { res, data } = await secureFetch('/api/admin/upi-url', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ restaurantId, upiUrl: trimmedUrl }),
+                body: { restaurantId, upiUrl: trimmedUrl },
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save UPI URL')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save UPI URL')
 
             setUpiUrl(data.upiUrl || '')
             setSaved(true)
@@ -1058,9 +1044,8 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
     const fetchDetails = async () => {
         setIsLoading(true)
         try {
-            const res = await fetch(`/api/admin/restaurant-details?restaurantId=${encodeURIComponent(restaurantId)}`)
-            const data = await res.json()
-            if (data.success) {
+            const { data } = await secureFetch(`/api/admin/restaurant-details?restaurantId=${encodeURIComponent(restaurantId)}`)
+            if (data?.success) {
                 setAddress(data.address || '')
                 setPhoneNumber(data.phoneNumber || '')
                 setDirectionsUrl(data.directionsUrl || '')
@@ -1085,19 +1070,17 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
         setSaved(false)
         setIsSaving(true)
         try {
-            const res = await fetch('/api/admin/restaurant-details', {
+            const { res, data } = await secureFetch('/api/admin/restaurant-details', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: {
                     restaurantId,
                     address: address.trim(),
                     phoneNumber: phoneNumber.trim(),
                     directionsUrl: directionsUrl.trim(),
                     city,
-                }),
+                },
             })
-            const data = await res.json()
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save restaurant details')
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save restaurant details')
 
             setAddress(data.address || '')
             setPhoneNumber(data.phoneNumber || '')
@@ -1283,9 +1266,8 @@ export default function AdminDashboardPage() {
             setRevenueLoading(true)
             setRevenueError('')
             try {
-                const res = await fetch(`/api/admin/revenue?restaurantId=${encodeURIComponent(owner.restaurantId!)}`)
-                const data = await res.json()
-                if (!res.ok || !data.success) throw new Error(data.error || 'Failed to fetch revenue')
+                const { res, data } = await secureFetch(`/api/admin/revenue?restaurantId=${encodeURIComponent(owner.restaurantId!)}`)
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to fetch revenue')
                 setRevenueStats(data.stats)
                 setRevenueTransactions(data.transactions)
             } catch (error) {
@@ -1310,9 +1292,8 @@ export default function AdminDashboardPage() {
                 if (dateFrom) params.set('startDate', dateFrom)
                 if (dateTo) params.set('endDate', dateTo)
 
-                const res = await fetch(`/api/admin/payments?${params.toString()}`)
-                const data = await res.json()
-                if (!res.ok || !data.success) throw new Error(data.error || 'Failed to fetch payments')
+                const { res, data } = await secureFetch(`/api/admin/payments?${params.toString()}`)
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to fetch payments')
                 setPaymentsTransactions(data.transactions)
                 setPaymentsTotal(data.totalAmount)
             } catch (error) {

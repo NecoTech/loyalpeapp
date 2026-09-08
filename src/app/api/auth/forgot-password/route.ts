@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import crypto from 'crypto'
 import { getUsersCollection, getPasswordResetsCollection } from '../../../../../lib/mongodb'
 import { sendPasswordResetEmail } from '../../../../../lib/mail'
@@ -9,19 +9,19 @@ const TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
 export async function POST(request: Request) {
     let body: { email?: string }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const email = body.email?.trim().toLowerCase()
     if (!email || !EMAIL_REGEX.test(email)) {
-        return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Please enter a valid email address.' }, { status: 400 })
     }
 
     // Always return the same generic response whether or not the email has
     // an account, so this endpoint can't be used to enumerate accounts.
-    const genericResponse = NextResponse.json({
+    const genericResponse = encryptedJson({
         success: true,
         message: "If an account exists for that email, we've sent a password reset link.",
     })

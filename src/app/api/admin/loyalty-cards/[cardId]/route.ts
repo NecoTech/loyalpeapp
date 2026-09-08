@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../../lib/apiCrypto'
 import { ObjectId } from 'mongodb'
 import { getLoyaltyCardsCollection } from '../../../../../../lib/mongodb'
 
@@ -7,22 +7,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ca
 
     let body: { restaurantId?: string; name?: string }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const restaurantId = body.restaurantId?.trim().toLowerCase()
     const name = body.name?.trim()
 
     if (!ObjectId.isValid(cardId)) {
-        return NextResponse.json({ success: false, error: 'Invalid card id.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid card id.' }, { status: 400 })
     }
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
     if (!name) {
-        return NextResponse.json({ success: false, error: 'Card name is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Card name is required.' }, { status: 400 })
     }
 
     try {
@@ -33,13 +33,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ca
         )
 
         if (result.matchedCount === 0) {
-            return NextResponse.json({ success: false, error: 'Card not found.' }, { status: 404 })
+            return encryptedJson({ success: false, error: 'Card not found.' }, { status: 404 })
         }
 
-        return NextResponse.json({ success: true, card: { id: cardId, name } })
+        return encryptedJson({ success: true, card: { id: cardId, name } })
     } catch (error) {
         console.error('Update loyalty card error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }
 
@@ -49,10 +49,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     const restaurantId = searchParams.get('restaurantId')?.trim().toLowerCase()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
     if (!ObjectId.isValid(cardId)) {
-        return NextResponse.json({ success: false, error: 'Invalid card id.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid card id.' }, { status: 400 })
     }
 
     try {
@@ -60,12 +60,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
         const result = await cards.deleteOne({ _id: new ObjectId(cardId), restaurantId })
 
         if (result.deletedCount === 0) {
-            return NextResponse.json({ success: false, error: 'Card not found.' }, { status: 404 })
+            return encryptedJson({ success: false, error: 'Card not found.' }, { status: 404 })
         }
 
-        return NextResponse.json({ success: true })
+        return encryptedJson({ success: true })
     } catch (error) {
         console.error('Delete loyalty card error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

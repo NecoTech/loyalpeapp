@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
 import { extractUpiVpa } from '../../../../../lib/upi'
 
@@ -7,35 +7,35 @@ export async function GET(request: Request) {
     const restaurantId = searchParams.get('restaurantId')?.trim().toLowerCase()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     try {
         const owners = await getRestaurantOwnersCollection()
         const owner = await owners.findOne({ restaurantId })
-        return NextResponse.json({ success: true, upiUrl: owner?.upiUrl || '' })
+        return encryptedJson({ success: true, upiUrl: owner?.upiUrl || '' })
     } catch (error) {
         console.error('Fetch UPI URL error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }
 
 export async function POST(request: Request) {
     let body: { restaurantId?: string; upiUrl?: string }
     try {
-        body = await request.json()
+        body = await readEncryptedBody(request)
     } catch {
-        return NextResponse.json({ success: false, error: 'Invalid request body.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Invalid request body.' }, { status: 400 })
     }
 
     const restaurantId = body.restaurantId?.trim().toLowerCase()
     const upiUrl = body.upiUrl?.trim() || ''
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
     if (upiUrl && !upiUrl.includes('://')) {
-        return NextResponse.json({ success: false, error: 'Enter a valid UPI intent URL (e.g. upi://pay?pa=...).' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'Enter a valid UPI intent URL (e.g. upi://pay?pa=...).' }, { status: 400 })
     }
 
     // Extracted separately so a scanned QR can be matched back to this
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     // padded differently from what was pasted here.
     const upiVpa = upiUrl ? extractUpiVpa(upiUrl) : null
     if (upiUrl && !upiVpa) {
-        return NextResponse.json({ success: false, error: 'That UPI URL is missing a payee address (pa=...) — please check it and try again.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'That UPI URL is missing a payee address (pa=...) — please check it and try again.' }, { status: 400 })
     }
 
     try {
@@ -56,12 +56,12 @@ export async function POST(request: Request) {
         )
 
         if (result.matchedCount === 0) {
-            return NextResponse.json({ success: false, error: 'No restaurant account found for this restaurant ID.' }, { status: 404 })
+            return encryptedJson({ success: false, error: 'No restaurant account found for this restaurant ID.' }, { status: 404 })
         }
 
-        return NextResponse.json({ success: true, upiUrl })
+        return encryptedJson({ success: true, upiUrl })
     } catch (error) {
         console.error('Save UPI URL error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

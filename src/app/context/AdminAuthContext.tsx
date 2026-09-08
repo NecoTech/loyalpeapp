@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { encrypt, decrypt } from '..//..//..//lib/encryption'
+import { secureFetch } from '../../../lib/secureFetch'
 
 type Owner = {
   email: string
@@ -57,14 +58,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, restaurantName: string, restaurantId?: string, city?: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/admin/auth/register', {
+      const { res, data } = await secureFetch('/api/admin/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, restaurantName, restaurantId, city }),
+        body: { email, password, restaurantName, restaurantId, city },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to create account.' }
       }
 
@@ -78,14 +77,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/admin/auth/login', {
+      const { res, data } = await secureFetch('/api/admin/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       })
-      const data = await res.json()
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         return { success: false, error: data.error || 'Failed to sign in.' }
       }
 

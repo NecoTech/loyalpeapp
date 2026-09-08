@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { Lock, Eye, EyeOff, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
@@ -72,14 +73,12 @@ function ResetPasswordContent() {
 
         setIsSubmitting(true)
         try {
-            const res = await fetch('/api/auth/reset-password', {
+            const { data } = await secureFetch('/api/auth/reset-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, password }),
+                body: { token, password },
             })
-            const data = await res.json()
-            if (!data.success) {
-                setError(data.error || 'Something went wrong. Please try again.')
+            if (!data?.success) {
+                setError(data?.error || 'Something went wrong. Please try again.')
                 return
             }
             setIsDone(true)

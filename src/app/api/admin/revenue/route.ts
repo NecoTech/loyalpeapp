@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getTransactionsCollection } from '../../../../../lib/mongodb'
 
 function isSameDay(a: Date, b: Date) {
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const restaurantId = searchParams.get('restaurantId')?.trim().toLowerCase()
 
     if (!restaurantId) {
-        return NextResponse.json({ success: false, error: 'restaurantId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'restaurantId is required.' }, { status: 400 })
     }
 
     try {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         const totalDiscountGiven = transactions.reduce((sum, t) => sum + (t.discountAmount || 0), 0)
         const freeItemsRedeemed = transactions.filter(t => t.freeItemName).length
 
-        return NextResponse.json({
+        return encryptedJson({
             success: true,
             stats: {
                 totalRevenue,
@@ -49,6 +49,6 @@ export async function GET(request: Request) {
         })
     } catch (error) {
         console.error('Get admin revenue error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

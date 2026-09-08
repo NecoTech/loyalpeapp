@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getTransactionsCollection } from '../../../../../lib/mongodb'
 
 /**
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const userId = searchParams.get('userId')?.trim().toLowerCase()
 
     if (!userId) {
-        return NextResponse.json({ success: false, error: 'userId is required.' }, { status: 400 })
+        return encryptedJson({ success: false, error: 'userId is required.' }, { status: 400 })
     }
 
     try {
@@ -22,9 +22,9 @@ export async function GET(request: Request) {
             { $group: { _id: null, totalSaved: { $sum: '$discountAmount' } } },
         ]).toArray()
 
-        return NextResponse.json({ success: true, totalSaved: result?.totalSaved || 0 })
+        return encryptedJson({ success: true, totalSaved: result?.totalSaved || 0 })
     } catch (error) {
         console.error('Get savings total error:', error)
-        return NextResponse.json({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
+        return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

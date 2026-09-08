@@ -20,6 +20,7 @@ import { useLocation, useCityCounts, CITIES } from './context/LocationContext'
 import { hasSeenOnboarding } from '../../lib/onboarding'
 import { normalizeCityName } from '../../lib/cities'
 import { cn } from '../../lib/utils'
+import { secureFetch } from '../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
@@ -76,9 +77,8 @@ export default function Home() {
 
         const fetchSavings = async () => {
             try {
-                const res = await fetch(`/api/loyalty/savings?userId=${encodeURIComponent(userId)}`)
-                const data = await res.json()
-                if (data.success) setTotalSaved(data.totalSaved)
+                const { data } = await secureFetch(`/api/loyalty/savings?userId=${encodeURIComponent(userId)}`)
+                if (data?.success) setTotalSaved(data.totalSaved)
             } catch (err) {
                 console.error('Failed to load savings total', err)
             }

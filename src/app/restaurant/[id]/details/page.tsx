@@ -6,6 +6,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ArrowLeft, Check, ChevronRight, Gift, MapPin, Navigation, Phone, Store } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { cn } from '../../../../../lib/utils'
+import { secureFetch } from '../../../../../lib/secureFetch'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
@@ -200,10 +201,9 @@ export default function RestaurantDetailsPage() {
     useEffect(() => {
         const fetchRestaurant = async () => {
             try {
-                const res = await fetch(`/api/restaurant/${id}`)
+                const { res, data } = await secureFetch(`/api/restaurant/${id}`)
                 if (!res.ok) return
-                const data = await res.json()
-                if (!data.success || !data.restaurant) return
+                if (!data?.success || !data.restaurant) return
                 setRestaurant(data.restaurant)
             } catch (err) {
                 console.error('Failed to load restaurant details', err)
@@ -217,9 +217,8 @@ export default function RestaurantDetailsPage() {
                 const searchParams = new URLSearchParams({ restaurantId: id })
                 if (userId) searchParams.set('userId', userId)
 
-                const res = await fetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
-                const data = await res.json()
-                if (res.ok && data.success) {
+                const { res, data } = await secureFetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
+                if (res.ok && data?.success) {
                     setCards((data.cards as LoyaltyCard[]).filter(c => c.items.length > 0))
                 }
             } catch (err) {

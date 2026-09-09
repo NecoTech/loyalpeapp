@@ -6,6 +6,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ArrowLeft, Home, X, CreditCard, Store, Delete, Check, ChevronDown, Gift, QrCode, AlertTriangle, Loader2, BadgeCheck, Star, Sparkles, Cake } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
+import { readPendingUpiPayment, writePendingUpiPayment, clearPendingUpiPayment } from '../../../lib/pendingUpiPayment'
 import { useAuth } from '../context/AuthContext'
 import Image from "next/image"
 
@@ -107,55 +108,6 @@ const CARD_THEMES = [
     { bg: '#D2F843', text: 'text-zinc-900', mutedText: 'text-zinc-900/60', badge: 'bg-black/10 border-black/20 text-zinc-900', checkedText: '#4d7c0f' },
     { bg: '#FB7185', text: 'text-white', mutedText: 'text-white/70', badge: 'bg-white/20 border-white/30 text-white', checkedText: '#e11d48' },
 ]
-
-// Persists the in-flight UPI payment to localStorage (not just React state)
-// so a payment can still be confirmed if the browser tab/PWA gets closed or
-// killed while the UPI app is in the foreground — common on Android when
-// switching to GPay/PhonePe under memory pressure — and the user comes back
-// by reopening Loyalpe manually rather than switching back to the same tab.
-const PENDING_UPI_PAYMENT_KEY = 'loyalpe_pending_upi_payment'
-const PENDING_UPI_PAYMENT_TTL_MS = 45 * 60 * 1000 // matches typical UPI intent validity
-
-type PendingUpiPayment = { referenceId: string; restaurantId: string; startedAt: number }
-
-function readPendingUpiPayment(): PendingUpiPayment | null {
-    try {
-        const raw = localStorage.getItem(PENDING_UPI_PAYMENT_KEY)
-        if (!raw) return null
-        const parsed = JSON.parse(raw) as PendingUpiPayment
-        if (!parsed?.referenceId || !parsed?.restaurantId || !parsed?.startedAt) return null
-        if (Date.now() - parsed.startedAt > PENDING_UPI_PAYMENT_TTL_MS) {
-            localStorage.removeItem(PENDING_UPI_PAYMENT_KEY)
-            return null
-        }
-        return parsed
-    } catch {
-        return null
-    }
-}
-
-function writePendingUpiPayment(payment: PendingUpiPayment) {
-    try {
-        localStorage.setItem(PENDING_UPI_PAYMENT_KEY, JSON.stringify(payment))
-    } catch {
-        // localStorage unavailable — the in-tab visibilitychange listener
-        // still covers the common case of switching back to the same tab.
-    }
-}
-
-function clearPendingUpiPayment(referenceId?: string) {
-    try {
-        if (referenceId) {
-            const existing = readPendingUpiPayment()
-            // Don't clobber a newer pending payment that may have started
-            // (e.g. a second payment) since this one was recorded.
-            if (existing && existing.referenceId !== referenceId) return
-        }
-        localStorage.removeItem(PENDING_UPI_PAYMENT_KEY)
-    } catch {
-        // ignore
-    }
-}
 
 export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }) {
     const router = useRouter()
@@ -321,12 +273,20 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
     // Records the redemption/transaction in our own system once Omniware has
     // actually confirmed the money was received.
-    const finalizePayment = async (orderId?: string) => {
-        const userId = user?.email || user?.phoneNumber
+    // `override` supplies the userId/amount/card/item to redeem when the
+    // live component state can't be trusted — specifically the
+    // pending-payment restore path below, where the page just mounted
+    // fresh (tab/PWA was closed mid-payment) so `amount`/`activeItem`/
+    // `loyaltyCardId` are back at their defaults, and AuthContext may not
+    // have finished rehydrating `user` from localStorage yet either.
+    const finalizePayment = async (orderId?: string, override?: { userId: string; amount: number; cardId?: string; itemId?: string }) => {
+        const userId = override?.userId ?? (user?.email || user?.phoneNumber)
         if (!userId) return
 
-        const redeemedItem = activeItem
-        const redeemedCardId = loyaltyCardId
+        const redeemedItem = override ? null : activeItem
+        const redeemedCardId = override ? (override.cardId ?? null) : loyaltyCardId
+        const redeemedItemId = override ? override.itemId : redeemedItem?.id
+        const paymentAmount = override?.amount ?? numericAmount
 
         setIsPaying(true)
         try {
@@ -335,9 +295,9 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                 body: {
                     userId,
                     restaurantId,
-                    cardId: loyaltyCardId || undefined,
-                    itemId: redeemedItem?.id,
-                    amount: numericAmount,
+                    cardId: redeemedCardId || undefined,
+                    itemId: redeemedItemId,
+                    amount: paymentAmount,
                     orderId,
                 },
             })
@@ -360,7 +320,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             // payment just redeemed from with its up-to-date stamp state.
             if (redeemedCardId) {
                 setSuccessCardId(redeemedCardId)
-                setSuccessItemId(redeemedItem?.id ?? null)
+                setSuccessItemId(redeemedItemId ?? null)
                 try {
                     const searchParams = new URLSearchParams({ restaurantId, userId })
                     const { res: cardsRes, data: cardsData } = await secureFetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
@@ -485,8 +445,10 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         }
     }
 
-    // Checks payment status once, and finalizes the loyalty redemption on success.
-    const checkUpiPaymentStatus = async (referenceId: string) => {
+    // Checks payment status once, and finalizes the loyalty redemption on
+    // success. `override` is forwarded to finalizePayment — see its comment
+    // for why the pending-payment restore path needs it.
+    const checkUpiPaymentStatus = async (referenceId: string, override?: { userId: string; amount: number; cardId?: string; itemId?: string }) => {
         if (isCheckingStatusRef.current) return false
         isCheckingStatusRef.current = true
         setIsCheckingUpiPayment(true)
@@ -501,7 +463,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             if (result.success && result.txnStatus === 'SUCCESS') {
                 setShowUpiSheet(false)
                 clearPendingUpiPayment(referenceId)
-                await finalizePayment(referenceId)
+                await finalizePayment(referenceId, override)
                 return true
             } else if (result.success && (result.txnStatus === 'FAILED' || result.txnStatus === 'CANCELLED')) {
                 setShowUpiSheet(false)
@@ -566,7 +528,25 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             setUpiIntentUrl(intentData.upi_intent_url)
             setUpiQrCode(intentData.qr_code || null)
             setShowUpiSheet(true)
-            writePendingUpiPayment({ referenceId, restaurantId, startedAt: Date.now() })
+            const payerId = user?.email || user?.phoneNumber || phoneNumber
+            writePendingUpiPayment({
+                referenceId,
+                restaurantId,
+                startedAt: Date.now(),
+                userId: payerId,
+                amount: numericAmount,
+                finalAmount,
+                cardId: loyaltyCardId || undefined,
+                itemId: activeItem?.id,
+                ...(activeItem?.rewardType === 'discount' ? {
+                    discountAmount,
+                    discountType: activeItem.discountType,
+                    discountValue: activeItem.discountValue,
+                } : {}),
+                ...(activeItem?.rewardType === 'freeItem' ? {
+                    freeItemName: activeItem.freeItemName,
+                } : {}),
+            })
         } catch (err) {
             console.error('Error initiating UPI intent payment:', err)
             setPaymentFailed(true)
@@ -652,7 +632,8 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         if (!pending || pending.restaurantId !== restaurantId) return
 
         setIsVerifyingPendingPayment(true)
-        checkUpiPaymentStatus(pending.referenceId).finally(() => setIsVerifyingPendingPayment(false))
+        checkUpiPaymentStatus(pending.referenceId, { userId: pending.userId, amount: pending.amount, cardId: pending.cardId, itemId: pending.itemId })
+            .finally(() => setIsVerifyingPendingPayment(false))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [restaurantId])
 

@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
+import { verifyPendingUpiPayment } from '../../../lib/pendingUpiPayment'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'] })
@@ -103,7 +104,7 @@ function dateGroupLabel(dateStr: string) {
 
 export default function TransactionsPage() {
     const router = useRouter()
-    const { user } = useAuth()
+    const { user, isInitialized } = useAuth()
 
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -114,7 +115,18 @@ export default function TransactionsPage() {
     const [isDrawerVisible, setIsDrawerVisible] = useState(false)
     const drawerCloseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+    // Surfaced when a UPI payment is found and reconciled here that never
+    // got recorded on the payment page itself (e.g. the tab/PWA was closed
+    // before the user returned to it) — see the reconciliation effect below.
+    const [reconciledBanner, setReconciledBanner] = useState<{ type: 'success' | 'failed'; message: string } | null>(null)
+
     useEffect(() => {
+        // Wait for AuthContext to finish reading localStorage before
+        // deciding there's no one logged in — on a fresh page load this
+        // effect can otherwise fire before that rehydration completes and
+        // bounce a genuinely logged-in user to the login screen.
+        if (!isInitialized) return
+
         const userId = user?.email || user?.phoneNumber
         if (!userId) {
             router.push(`/auth?redirect=${encodeURIComponent('/transactions')}`)
@@ -134,8 +146,34 @@ export default function TransactionsPage() {
                 setIsLoading(false)
             }
         }
-        fetchTransactions()
-    }, [user, router])
+
+        const reconcileAndFetch = async () => {
+            // A safety net for a payment that succeeded in the UPI app but
+            // never made it into a transaction — the restaurant payment
+            // page couldn't confirm it (tab/PWA closed) and the user came
+            // straight here instead of back to that page. Runs before the
+            // list fetch so a just-reconciled payment is already included.
+            try {
+                const result = await verifyPendingUpiPayment()
+                if (result.outcome === 'success') {
+                    setReconciledBanner({ type: 'success', message: 'Found a completed payment and added it to your transactions.' })
+                } else if (result.outcome === 'failed') {
+                    setReconciledBanner({ type: 'failed', message: result.message })
+                }
+            } catch (err) {
+                console.error('Failed to verify a pending UPI payment', err)
+            }
+            await fetchTransactions()
+        }
+
+        reconcileAndFetch()
+    }, [user, isInitialized, router])
+
+    useEffect(() => {
+        if (!reconciledBanner) return
+        const timeout = setTimeout(() => setReconciledBanner(null), 6000)
+        return () => clearTimeout(timeout)
+    }, [reconciledBanner])
 
     const filteredTransactions = useMemo(() => {
         const query = searchQuery.trim().toLowerCase()
@@ -199,6 +237,18 @@ export default function TransactionsPage() {
 
             {/* Scrollable Content Canvas */}
             <main className="flex-1 px-4 pt-4 pb-6 max-w-2xl w-full mx-auto">
+                {reconciledBanner && (
+                    <div
+                        className={cn(
+                            "mb-4 px-4 py-3 rounded-xl neo-border neo-shadow-badge flex items-start gap-2.5 text-sm font-bold",
+                            reconciledBanner.type === 'success' ? "bg-[#d1fae5] text-[#065f46]" : "bg-[#ffdad6] text-[#93000a]"
+                        )}
+                    >
+                        {reconciledBanner.type === 'success' ? <BadgeCheck size={18} className="shrink-0 mt-0.5" /> : <HelpCircle size={18} className="shrink-0 mt-0.5" />}
+                        <span>{reconciledBanner.message}</span>
+                    </div>
+                )}
+
                 {/* Search */}
                 <div className="relative mb-5">
                     <input

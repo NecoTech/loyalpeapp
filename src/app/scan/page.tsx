@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hanken_Grotesk } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import { ArrowLeft } from 'lucide-react'
 import jsQR from 'jsqr'
 import { cn } from '../../../lib/utils'
 import { extractUpiVpa } from '../../../lib/upi'
 
-const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '700', '800'] })
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 type Status = 'requesting' | 'scanning' | 'resolving' | 'error'
 
@@ -153,7 +153,7 @@ export default function ScanPage() {
     }, [])
 
     return (
-        <div className={cn(hankenGrotesk.className, "bg-[#30312c] h-[100dvh] w-full overflow-hidden relative text-white")}>
+        <div className={cn(inter.className, "bg-black text-white antialiased select-none h-[100dvh] w-full overflow-hidden flex flex-col justify-between items-center relative")}>
             {/* Camera feed */}
             <video
                 ref={videoRef}
@@ -161,50 +161,42 @@ export default function ScanPage() {
                 muted
                 playsInline
             />
-            <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#1b1c18]/60 to-[#0d6683]/40 mix-blend-multiply" />
+            <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(circle_at_60%_40%,transparent_0%,rgba(0,0,0,0.4)_60%,rgba(0,0,0,0.85)_100%)]" />
             <canvas ref={canvasRef} className="hidden" />
 
             {/* Top Navigation */}
-            <div className="relative z-10 w-full pt-12 px-6 flex justify-between items-center">
+            <header className="relative z-20 w-full pt-12 pb-4 px-6 flex items-center justify-center max-w-md mx-auto">
                 <button
                     onClick={() => { stopCamera(); router.back() }}
-                    aria-label="Back"
-                    className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    aria-label="Go back"
+                    type="button"
+                    className="absolute left-6 w-11 h-11 rounded-full bg-zinc-800/80 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-95 transition-transform hover:bg-zinc-700/80"
                 >
                     <ArrowLeft size={22} />
                 </button>
-                <h1 className="text-[28px] leading-[34px] font-bold tracking-tight text-white">Scan QR</h1>
-                <div className="w-12 h-12" />
-            </div>
+                <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-md">
+                    Scan QR
+                </h1>
+            </header>
 
             {/* Scanner Viewfinder */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-3/4 max-w-sm aspect-square">
-                <div className="relative w-full h-full rounded-2xl border-4 border-[#c5f253] shadow-[0_0_20px_rgba(197,242,83,0.4)] overflow-hidden">
-                    {status === 'scanning' && (
-                        <div className="absolute left-0 right-0 h-1 bg-[#c5f253] shadow-[0_0_15px_rgba(197,242,83,0.8)] scan-laser z-20" />
-                    )}
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl -m-1" />
-                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl -m-1" />
-                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl -m-1" />
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl -m-1" />
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-6">
+                <div className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-3xl border-[3.5px] border-[#B4F82C] shadow-[0_0_16px_rgba(180,248,44,0.45),inset_0_0_12px_rgba(180,248,44,0.25)] overflow-hidden bg-black/10">
+                    <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-white/60" />
+                    <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-white/60" />
+                    <div className="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-white/60" />
+                    <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-white/60" />
                 </div>
-                <p className="text-center mt-4 text-white/80">
+                <p className="mt-6 text-sm font-medium text-zinc-300 tracking-wide text-center drop-shadow">
                     {status === 'requesting' && 'Requesting camera access...'}
                     {status === 'scanning' && 'Align QR code within frame'}
                     {status === 'resolving' && 'Matching restaurant...'}
                     {status === 'error' && errorMessage}
                 </p>
-            </div>
+            </main>
 
-            <style jsx global>{`
-                .scan-laser {
-                    animation: scan 2s linear infinite;
-                }
-                @keyframes scan {
-                    0%, 100% { top: 0; }
-                    50% { top: 100%; }
-                }
-            `}</style>
+            {/* Bottom safe-area spacer */}
+            <footer className="relative z-20 w-full pb-8 pt-2 px-6 max-w-md mx-auto" />
         </div>
     )
 }

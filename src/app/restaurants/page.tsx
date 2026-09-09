@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ArrowLeft, MapPin, Search, Store, X } from 'lucide-react'
-import { useLocation, useCityCounts, CITIES } from '../context/LocationContext'
+import { useLocation, useCityCounts, getCityOptions } from '../context/LocationContext'
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
@@ -126,15 +126,16 @@ export default function RestaurantsPage() {
         if (isCitySheetVisible) searchInputRef.current?.focus()
     }, [isCitySheetVisible])
 
+    const cityOptions = useMemo(() => getCityOptions(cityCounts), [cityCounts])
     const trimmedCitySearch = citySearch.trim()
-    const filteredCities = CITIES.filter(city =>
+    const filteredCities = cityOptions.filter(city =>
         city.name.toLowerCase().includes(trimmedCitySearch.toLowerCase())
     )
     // Typed something that isn't already one of the popular cities — offer
     // to use it directly instead of dead-ending on "no cities found".
     const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
     const showCustomCityOption = normalizedCustomCity.length >= 2
-        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
+        && !cityOptions.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     return (
         <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#FBF7EE] text-[#121212] flex justify-center selection:bg-[#FFBE18] selection:text-black")}>
@@ -144,7 +145,7 @@ export default function RestaurantsPage() {
                     <button
                         aria-label="Go back"
                         onClick={() => router.push('/')}
-                        className="w-11 h-11 bg-white brutal-border rounded-full brutal-shadow-sm flex items-center justify-center brutal-press transition-all cursor-pointer"
+                        className="w-11 h-11 rounded-2xl bg-white border-2 border-[#111111] keypad-shadow flex items-center justify-center transition-all active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
                     >
                         <ArrowLeft size={20} strokeWidth={2.5} />
                     </button>

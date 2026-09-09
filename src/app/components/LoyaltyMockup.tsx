@@ -108,6 +108,55 @@ const CARD_THEMES = [
     { bg: '#FB7185', text: 'text-white', mutedText: 'text-white/70', badge: 'bg-white/20 border-white/30 text-white', checkedText: '#e11d48' },
 ]
 
+// Persists the in-flight UPI payment to localStorage (not just React state)
+// so a payment can still be confirmed if the browser tab/PWA gets closed or
+// killed while the UPI app is in the foreground — common on Android when
+// switching to GPay/PhonePe under memory pressure — and the user comes back
+// by reopening Loyalpe manually rather than switching back to the same tab.
+const PENDING_UPI_PAYMENT_KEY = 'loyalpe_pending_upi_payment'
+const PENDING_UPI_PAYMENT_TTL_MS = 45 * 60 * 1000 // matches typical UPI intent validity
+
+type PendingUpiPayment = { referenceId: string; restaurantId: string; startedAt: number }
+
+function readPendingUpiPayment(): PendingUpiPayment | null {
+    try {
+        const raw = localStorage.getItem(PENDING_UPI_PAYMENT_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as PendingUpiPayment
+        if (!parsed?.referenceId || !parsed?.restaurantId || !parsed?.startedAt) return null
+        if (Date.now() - parsed.startedAt > PENDING_UPI_PAYMENT_TTL_MS) {
+            localStorage.removeItem(PENDING_UPI_PAYMENT_KEY)
+            return null
+        }
+        return parsed
+    } catch {
+        return null
+    }
+}
+
+function writePendingUpiPayment(payment: PendingUpiPayment) {
+    try {
+        localStorage.setItem(PENDING_UPI_PAYMENT_KEY, JSON.stringify(payment))
+    } catch {
+        // localStorage unavailable — the in-tab visibilitychange listener
+        // still covers the common case of switching back to the same tab.
+    }
+}
+
+function clearPendingUpiPayment(referenceId?: string) {
+    try {
+        if (referenceId) {
+            const existing = readPendingUpiPayment()
+            // Don't clobber a newer pending payment that may have started
+            // (e.g. a second payment) since this one was recorded.
+            if (existing && existing.referenceId !== referenceId) return
+        }
+        localStorage.removeItem(PENDING_UPI_PAYMENT_KEY)
+    } catch {
+        // ignore
+    }
+}
+
 export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }) {
     const router = useRouter()
     const { user, login } = useAuth()
@@ -136,6 +185,11 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     const [upiQrCode, setUpiQrCode] = useState<string | null>(null)
     const [upiReferenceId, setUpiReferenceId] = useState<string | null>(null)
     const [isCheckingUpiPayment, setIsCheckingUpiPayment] = useState(false)
+    // Set only while re-checking a payment restored from localStorage on
+    // mount (see the pending-payment effect below) — distinct from
+    // isCheckingUpiPayment so the sheet's own "Checking..." button state
+    // isn't affected when the sheet was never reopened.
+    const [isVerifyingPendingPayment, setIsVerifyingPendingPayment] = useState(false)
     const [paymentFailed, setPaymentFailed] = useState(false)
     const [paymentFailedMessage, setPaymentFailedMessage] = useState('')
     const hasLeftAppRef = useRef(false)
@@ -446,10 +500,12 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
             if (result.success && result.txnStatus === 'SUCCESS') {
                 setShowUpiSheet(false)
+                clearPendingUpiPayment(referenceId)
                 await finalizePayment(referenceId)
                 return true
             } else if (result.success && (result.txnStatus === 'FAILED' || result.txnStatus === 'CANCELLED')) {
                 setShowUpiSheet(false)
+                clearPendingUpiPayment(referenceId)
                 setPaymentFailed(true)
                 setPaymentFailedMessage(
                     result.txnStatus === 'CANCELLED'
@@ -473,6 +529,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         setUpiIntentUrl(null)
         setUpiQrCode(null)
         hasLeftAppRef.current = false
+        if (upiReferenceId) clearPendingUpiPayment(upiReferenceId)
     }
 
     const startUpiIntent = async (phoneNumber: string) => {
@@ -509,6 +566,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             setUpiIntentUrl(intentData.upi_intent_url)
             setUpiQrCode(intentData.qr_code || null)
             setShowUpiSheet(true)
+            writePendingUpiPayment({ referenceId, restaurantId, startedAt: Date.now() })
         } catch (err) {
             console.error('Error initiating UPI intent payment:', err)
             setPaymentFailed(true)
@@ -581,6 +639,22 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showUpiSheet, upiReferenceId])
+
+    // Covers the case where the browser tab (or an installed PWA) was fully
+    // closed or killed while the UPI app was in the foreground — no
+    // visibilitychange event ever fires on return, since this is a fresh
+    // mount. If a payment was left pending for this restaurant, check it
+    // once on load so a payment made in the UPI app still gets confirmed
+    // and shown here without the user having to re-enter the amount.
+    useEffect(() => {
+        if (!restaurantId) return
+        const pending = readPendingUpiPayment()
+        if (!pending || pending.restaurantId !== restaurantId) return
+
+        setIsVerifyingPendingPayment(true)
+        checkUpiPaymentStatus(pending.referenceId).finally(() => setIsVerifyingPendingPayment(false))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [restaurantId])
 
     // ── Loyalty cards drawer helpers ─────────────────────────────────────
     const openDrawer = () => {
@@ -956,6 +1030,19 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                             {isCheckingUpiPayment && <Loader2 size={18} className="animate-spin" />}
                             {isCheckingUpiPayment ? 'Checking...' : "I've Completed the Payment"}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Re-verifying a payment restored from a closed/killed tab */}
+            {isVerifyingPendingPayment && (
+                <div className="fixed inset-0 z-[100] bg-[#111111]/40 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-white w-full max-w-xs rounded-2xl border-2 border-[#111111] keypad-shadow-lg p-6 flex flex-col items-center gap-3 text-center">
+                        <Loader2 size={28} className="animate-spin text-[#111111]" />
+                        <div>
+                            <h3 className="text-lg font-extrabold text-[#111111]">Checking your payment</h3>
+                            <p className="text-sm text-zinc-500 mt-1">Confirming the payment you just made...</p>
+                        </div>
                     </div>
                 </div>
             )}

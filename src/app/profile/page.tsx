@@ -25,6 +25,11 @@ import {
     Send,
     Copy,
     PhoneCall,
+    Gavel,
+    Store,
+    Award,
+    Shield,
+    ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
@@ -44,14 +49,17 @@ function getInitials(name?: string) {
         .join('')
 }
 
-function ModalBackdrop({ onClose, children, maxWidth = '340px' }: { onClose: () => void; children: ReactNode; maxWidth?: string }) {
+function ModalBackdrop({ onClose, children, maxWidth = '340px', contentClassName }: { onClose: () => void; children: ReactNode; maxWidth?: string; contentClassName?: string }) {
     return (
         <div
             className="modal-backdrop-in fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={e => { if (e.target === e.currentTarget) onClose() }}
         >
             <div
-                className="modal-pop-in bg-white border-[3px] border-[#1c1b1b] rounded-2xl p-4 w-full shadow-[6px_6px_0px_#111111] text-center relative"
+                className={cn(
+                    "modal-pop-in bg-white border-[3px] border-[#1c1b1b] rounded-2xl p-4 w-full shadow-[6px_6px_0px_#111111] text-center relative",
+                    contentClassName
+                )}
                 style={{ maxWidth }}
             >
                 {children}
@@ -126,6 +134,7 @@ export default function ProfilePage() {
 
     const [isLogoutOpen, setIsLogoutOpen] = useState(false)
     const [isContactOpen, setIsContactOpen] = useState(false)
+    const [isTermsOpen, setIsTermsOpen] = useState(false)
     const [copiedField, setCopiedField] = useState<'email' | 'phone' | null>(null)
 
     useEffect(() => {
@@ -267,7 +276,7 @@ export default function ProfilePage() {
                                 iconColor="#1c1b1b"
                                 label="Terms and Conditions"
                                 description="Legal terms of using loyalpe"
-                                onClick={() => router.push('/terms-of-service')}
+                                onClick={() => setIsTermsOpen(true)}
                             />
                             <SettingsRow
                                 icon={<Headphones size={19} />}
@@ -549,6 +558,86 @@ export default function ProfilePage() {
                         >
                             Got It
                         </button>
+                    </div>
+                </ModalBackdrop>
+            )}
+
+            {/* Terms & Conditions Modal */}
+            {isTermsOpen && (
+                <ModalBackdrop onClose={() => setIsTermsOpen(false)} maxWidth="380px" contentClassName="max-h-[85vh] flex flex-col">
+                    <ModalCloseButton onClick={() => setIsTermsOpen(false)} />
+                    <div className="text-left flex flex-col min-h-0">
+                        <div className="flex items-center gap-3 mb-2 shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-[#dde1ff] border-[3px] border-[#1c1b1b] flex items-center justify-center shadow-[3px_3px_0px_#111111]">
+                                <Gavel size={24} className="text-[#0040e0]" />
+                            </div>
+                            <div>
+                                <h4 className="text-xl leading-[26px] tracking-[-0.015em] font-extrabold text-[#1c1b1b]">Terms &amp; Conditions</h4>
+                                <p className="text-[11px] leading-[14px] font-extrabold text-[#0040e0]">Loyalpe Loyalty &amp; Rewards</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-3 shrink-0">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#ffdf99] text-[#251a00] text-[11px] font-extrabold border-[1.5px] border-[#1c1b1b]">
+                                v2.4.0 &bull; Updated May 2024
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#ebe7e7] text-[#434656] text-[11px] font-bold border-[1.5px] border-[#1c1b1b]">
+                                Official Policy
+                            </span>
+                        </div>
+
+                        <div className="overflow-y-auto pr-1 space-y-2.5 flex-1 text-[#1c1b1b]">
+                            <div className="p-2.5 rounded-lg bg-[#f6f3f2] border-2 border-[#1c1b1b] shadow-[2px_2px_0px_#111111]">
+                                <p className="text-[13px] leading-4 tracking-[0.03em] font-extrabold flex items-center gap-1.5 mb-1">
+                                    <Store size={16} className="text-[#0040e0]" />
+                                    1. About Loyalpe
+                                </p>
+                                <p className="text-xs leading-5 font-semibold text-[#434656]">
+                                    Loyalpe connects you with local cafes, restaurants, and retail spots to unlock instant cashback, digital loyalty stamp cards, and exclusive neighborhood perks.
+                                </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f6f3f2] border-2 border-[#1c1b1b] shadow-[2px_2px_0px_#111111]">
+                                <p className="text-[13px] leading-4 tracking-[0.03em] font-extrabold flex items-center gap-1.5 mb-1">
+                                    <Award size={16} className="text-[#b52603]" />
+                                    2. Stamp &amp; Reward Policy
+                                </p>
+                                <p className="text-xs leading-5 font-semibold text-[#434656]">
+                                    Stamps are credited automatically on verified merchant payments. Rewards are non-transferable and subject to merchant store hours and terms.
+                                </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f6f3f2] border-2 border-[#1c1b1b] shadow-[2px_2px_0px_#111111]">
+                                <p className="text-[13px] leading-4 tracking-[0.03em] font-extrabold flex items-center gap-1.5 mb-1">
+                                    <Shield size={16} className="text-[#0040e0]" />
+                                    3. Privacy &amp; Security
+                                </p>
+                                <p className="text-xs leading-5 font-semibold text-[#434656]">
+                                    All transaction data and payment security adheres strictly to standard encryption protocols. We never share your banking details.
+                                </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f6f3f2] border-2 border-[#1c1b1b] shadow-[2px_2px_0px_#111111]">
+                                <p className="text-[13px] leading-4 tracking-[0.03em] font-extrabold flex items-center gap-1.5 mb-1">
+                                    <Headphones size={16} className="text-[#6b5100]" />
+                                    4. Support &amp; Dispute
+                                </p>
+                                <p className="text-xs leading-5 font-semibold text-[#434656]">
+                                    Reach out directly via 24/7 dedicated assistance for transaction reversals or merchant loyalty queries.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pt-3 mt-1 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsTermsOpen(false)}
+                                className="w-full bg-[#0040e0] hover:bg-[#2e5bff] text-white text-[13px] leading-4 font-extrabold py-2.5 rounded-lg border-2 border-[#1c1b1b] shadow-[3px_3px_0px_#111111] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <ShieldCheck size={18} />
+                                <span>I Understand &amp; Accept</span>
+                            </button>
+                        </div>
                     </div>
                 </ModalBackdrop>
             )}

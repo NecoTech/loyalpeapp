@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type TouchEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Fredoka, Plus_Jakarta_Sans } from 'next/font/google'
 import {
@@ -14,7 +14,7 @@ import {
     CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useLocation, useCityCounts, CITIES } from '../context/LocationContext'
+import { useLocation, useCityCounts, getCityOptions } from '../context/LocationContext'
 import { hasSeenOnboarding, markOnboardingSeen } from '../../../lib/onboarding'
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
@@ -216,8 +216,9 @@ export default function OnboardingPage() {
         if (isCityModalVisible) searchInputRef.current?.focus()
     }, [isCityModalVisible])
 
+    const cityOptions = useMemo(() => getCityOptions(cityCounts), [cityCounts])
     const trimmedCitySearch = citySearch.trim()
-    const filteredCities = CITIES.filter(city => {
+    const filteredCities = cityOptions.filter(city => {
         const query = trimmedCitySearch.toLowerCase()
         if (!query) return true
         return city.name.toLowerCase().includes(query) || city.region.toLowerCase().includes(query)
@@ -226,7 +227,7 @@ export default function OnboardingPage() {
     // to use it directly instead of dead-ending on "no cities found".
     const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
     const showCustomCityOption = normalizedCustomCity.length >= 2
-        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
+        && !cityOptions.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     if (!allowed) {
         return <div className="min-h-screen" style={{ backgroundColor: SLIDE_BG[0] }} />
@@ -279,28 +280,30 @@ export default function OnboardingPage() {
 
             {/* Carousel */}
             <div
-                className="flex-1 w-full max-w-md mx-auto relative overflow-hidden flex flex-col justify-center"
+                className="flex-1 min-h-0 w-full max-w-md mx-auto relative overflow-hidden flex flex-col"
                 onTouchStart={onTouchStart}
                 onTouchEnd={onTouchEnd}
             >
                 <div
-                    className="onboarding-slides-track flex w-full h-full"
+                    className="onboarding-slides-track flex w-full flex-1 min-h-0"
                     style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
                     {/* Slide 1: Stack Up Points */}
-                    <section className="min-w-full flex flex-col justify-between px-6 pt-2 pb-6 h-full">
-                        <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center my-auto">
-                            <GiftBoxIllustration />
+                    <section className="min-w-full flex flex-col px-6 pt-2 pb-6">
+                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+                            <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center">
+                                <GiftBoxIllustration />
+                            </div>
+                            <div className="text-center mt-2 px-2">
+                                <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-black drop-shadow-[0_2px_0_rgba(255,255,255,0.4)]")}>
+                                    STACK UP POINTS!
+                                </h1>
+                                <p className="font-bold text-black/90 text-[15px] sm:text-base leading-snug mt-2.5 max-w-[300px] mx-auto tracking-wide uppercase">
+                                    EVERY PURCHASE GETS YOU CLOSER TO FREE STUFF AND MORE PERKS.
+                                </p>
+                            </div>
                         </div>
-                        <div className="text-center mt-2 mb-6 px-2">
-                            <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-black drop-shadow-[0_2px_0_rgba(255,255,255,0.4)]")}>
-                                STACK UP POINTS!
-                            </h1>
-                            <p className="font-bold text-black/90 text-[15px] sm:text-base leading-snug mt-2.5 max-w-[300px] mx-auto tracking-wide uppercase">
-                                EVERY PURCHASE GETS YOU CLOSER TO FREE STUFF AND MORE PERKS.
-                            </p>
-                        </div>
-                        <div className="w-full mb-3 mt-auto">
+                        <div className="w-full mb-3 shrink-0">
                             <button
                                 onClick={nextSlide}
                                 className={cn(fredoka.className, "w-full bg-black hover:bg-neutral-900 text-white font-bold text-xl py-4 px-6 rounded-2xl border-[3px] border-black shadow-[0_5px_0_0_#4a3200] active:shadow-[0_1px_0_0_#000] active:translate-y-1 flex items-center justify-center gap-2 transition-transform cursor-pointer")}
@@ -312,19 +315,21 @@ export default function OnboardingPage() {
                     </section>
 
                     {/* Slide 2: Find Amazing Deals */}
-                    <section className="min-w-full flex flex-col justify-between px-6 pt-2 pb-6 h-full">
-                        <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center my-auto">
-                            <StorefrontIllustration />
+                    <section className="min-w-full flex flex-col px-6 pt-2 pb-6">
+                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+                            <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center">
+                                <StorefrontIllustration />
+                            </div>
+                            <div className="text-center mt-2 px-2">
+                                <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]")}>
+                                    FIND AMAZING DEALS!
+                                </h1>
+                                <p className="font-bold text-white/95 text-[15px] sm:text-base leading-snug mt-2.5 max-w-[300px] mx-auto tracking-wide uppercase">
+                                    UNCOVER COOL SHOPS AND UNIQUE BUSINESSES JUST A WALK AWAY.
+                                </p>
+                            </div>
                         </div>
-                        <div className="text-center mt-2 mb-6 px-2">
-                            <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]")}>
-                                FIND AMAZING DEALS!
-                            </h1>
-                            <p className="font-bold text-white/95 text-[15px] sm:text-base leading-snug mt-2.5 max-w-[300px] mx-auto tracking-wide uppercase">
-                                UNCOVER COOL SHOPS AND UNIQUE BUSINESSES JUST A WALK AWAY.
-                            </p>
-                        </div>
-                        <div className="w-full mb-3 mt-auto">
+                        <div className="w-full mb-3 shrink-0">
                             <button
                                 onClick={nextSlide}
                                 className={cn(fredoka.className, "w-full bg-[#FFE066] hover:bg-[#FFD700] text-black font-bold text-xl py-4 px-6 rounded-2xl border-[3px] border-black shadow-[0_4px_0_0_#000] active:shadow-[0_1px_0_0_#000] active:translate-y-1 flex items-center justify-center gap-2 transition-transform cursor-pointer")}
@@ -336,19 +341,21 @@ export default function OnboardingPage() {
                     </section>
 
                     {/* Slide 3: Get Local Deals */}
-                    <section className="min-w-full flex flex-col justify-between px-6 pt-2 pb-6 h-full">
-                        <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center my-auto">
-                            <MapPinIllustration />
+                    <section className="min-w-full flex flex-col px-6 pt-2 pb-6">
+                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+                            <div className="relative w-full max-w-[310px] mx-auto aspect-[5/4] flex items-center justify-center">
+                                <MapPinIllustration />
+                            </div>
+                            <div className="text-center mt-2 px-2">
+                                <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]")}>
+                                    GET LOCAL DEALS!
+                                </h1>
+                                <p className="font-medium text-white/95 text-[15px] sm:text-base leading-snug mt-2 max-w-[290px] mx-auto">
+                                    Unlock offers and coupons near you. Turn on location for a better experience.
+                                </p>
+                            </div>
                         </div>
-                        <div className="text-center mt-2 mb-4 px-2">
-                            <h1 className={cn(fredoka.className, "font-bold text-[34px] sm:text-[38px] leading-tight tracking-wide uppercase text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]")}>
-                                GET LOCAL DEALS!
-                            </h1>
-                            <p className="font-medium text-white/95 text-[15px] sm:text-base leading-snug mt-2 max-w-[290px] mx-auto">
-                                Unlock offers and coupons near you. Turn on location for a better experience.
-                            </p>
-                        </div>
-                        <div className="w-full flex flex-col space-y-2.5 mb-2 mt-auto">
+                        <div className="w-full flex flex-col space-y-2.5 mb-2 shrink-0">
                             <button
                                 onClick={openCityModal}
                                 className={cn(fredoka.className, "w-full bg-white hover:bg-slate-50 text-black font-bold text-lg sm:text-xl py-3 px-6 rounded-xl border-[3px] border-black shadow-[0_4px_0_0_#000] active:shadow-[0_1px_0_0_#000] active:translate-y-1 flex items-center justify-center tracking-wide transition-transform cursor-pointer")}

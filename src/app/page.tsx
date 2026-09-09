@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import {
@@ -16,7 +16,7 @@ import {
     User,
 } from 'lucide-react'
 import { useAuth } from './context/AuthContext'
-import { useLocation, useCityCounts, CITIES } from './context/LocationContext'
+import { useLocation, useCityCounts, getCityOptions } from './context/LocationContext'
 import { hasSeenOnboarding } from '../../lib/onboarding'
 import { normalizeCityName } from '../../lib/cities'
 import { cn } from '../../lib/utils'
@@ -117,15 +117,16 @@ export default function Home() {
         if (isCitySheetVisible) searchInputRef.current?.focus()
     }, [isCitySheetVisible])
 
+    const cityOptions = useMemo(() => getCityOptions(cityCounts), [cityCounts])
     const trimmedCitySearch = citySearch.trim()
-    const filteredCities = CITIES.filter(city =>
+    const filteredCities = cityOptions.filter(city =>
         city.name.toLowerCase().includes(trimmedCitySearch.toLowerCase())
     )
     // Typed something that isn't already one of the popular cities — offer
     // to use it directly instead of dead-ending on "no cities found".
     const normalizedCustomCity = trimmedCitySearch.length >= 2 ? normalizeCityName(trimmedCitySearch) : ''
     const showCustomCityOption = normalizedCustomCity.length >= 2
-        && !CITIES.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
+        && !cityOptions.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     if (!readyToRender) {
         return <div className="min-h-screen bg-[#FAF7F0]" />
@@ -317,7 +318,7 @@ export default function Home() {
                         <div className="overflow-y-auto no-scrollbar space-y-3 flex-1 pr-0.5">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-black uppercase tracking-wider text-[#111111]">Popular Cities</span>
-                                <span className="text-[11px] font-bold text-[#434656]">{CITIES.length} available</span>
+                                <span className="text-[11px] font-bold text-[#434656]">{cityOptions.length} available</span>
                             </div>
                             <div className="grid grid-cols-2 gap-2.5">
                                 {filteredCities.map(city => {

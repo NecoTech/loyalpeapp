@@ -40,6 +40,52 @@ export const CITIES: CityOption[] = [
     { name: 'Ahmedabad', region: 'Gujarat, India', code: 'AMD', color: '#BEF264', Icon: MapPin, iconBg: '#D1FAE5', iconColor: '#059669' },
 ]
 
+// Colors cycled for cities that have restaurants but aren't in the curated
+// CITIES shortlist above — keeps their badges visually distinct from each
+// other without needing per-city styling data for arbitrary city names.
+const EXTRA_CITY_COLORS = ['#BEF264', '#FFC72C', '#70D6FF', '#D8B4FE', '#FF88B8']
+
+function codeFromCityName(name: string): string {
+    const words = name.trim().split(/\s+/)
+    if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase()
+    }
+    return name.slice(0, 3).toUpperCase()
+}
+
+// Merges the curated CITIES shortlist with any other city that actually has
+// restaurants (from real per-city counts), then sorts so every city with at
+// least one restaurant comes first (busiest first), followed by cities with
+// none — used by every city-picker UI so "Popular Cities" always surfaces
+// real availability instead of just the fixed 8-city shortlist.
+export function getCityOptions(counts: Record<string, number>): CityOption[] {
+    const curatedNames = new Set(CITIES.map(c => c.name.toLowerCase()))
+    const extraNames = Object.keys(counts)
+        .filter(name => (counts[name] ?? 0) > 0 && !curatedNames.has(name.toLowerCase()))
+        .sort((a, b) => a.localeCompare(b))
+
+    const extra: CityOption[] = extraNames.map((name, i) => ({
+        name,
+        region: 'India',
+        code: codeFromCityName(name),
+        color: EXTRA_CITY_COLORS[i % EXTRA_CITY_COLORS.length],
+        Icon: MapPin,
+        iconBg: '#f0edec',
+        iconColor: '#1c1b1b',
+    }))
+
+    return [...CITIES, ...extra]
+        .map(city => ({ city, count: counts[city.name] ?? 0 }))
+        .sort((a, b) => {
+            const aHasRestaurants = a.count > 0
+            const bHasRestaurants = b.count > 0
+            if (aHasRestaurants !== bHasRestaurants) return aHasRestaurants ? -1 : 1
+            if (aHasRestaurants) return b.count - a.count
+            return 0
+        })
+        .map(entry => entry.city)
+}
+
 export const DEFAULT_CITY = 'Bengaluru'
 
 const STORAGE_KEY = 'loyalpe_selected_city'

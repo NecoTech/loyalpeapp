@@ -19,6 +19,15 @@ type RevenueStats = {
     avgTransactionValue: number
     totalDiscountGiven: number
     freeItemsRedeemed: number
+    uniqueCustomerCount: number
+    repeatCustomerCount: number
+}
+
+type RepeatCustomer = {
+    userId: string
+    name: string
+    transactionCount: number
+    totalSpent: number
 }
 
 type Transaction = {
@@ -1239,6 +1248,7 @@ export default function AdminDashboardPage() {
 
     const [revenueStats, setRevenueStats] = useState<RevenueStats | null>(null)
     const [revenueTransactions, setRevenueTransactions] = useState<Transaction[]>([])
+    const [repeatCustomers, setRepeatCustomers] = useState<RepeatCustomer[]>([])
     const [revenueLoading, setRevenueLoading] = useState(false)
     const [revenueError, setRevenueError] = useState('')
 
@@ -1270,6 +1280,7 @@ export default function AdminDashboardPage() {
                 if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to fetch revenue')
                 setRevenueStats(data.stats)
                 setRevenueTransactions(data.transactions)
+                setRepeatCustomers(data.repeatCustomers || [])
             } catch (error) {
                 console.error('Error fetching revenue:', error)
                 setRevenueError('Could not load revenue data right now.')
@@ -1347,6 +1358,31 @@ export default function AdminDashboardPage() {
                             <StatCard label="Avg. Transaction" value={formatCurrency(revenueStats?.avgTransactionValue || 0)} />
                             <StatCard label="Discounts Given" value={formatCurrency(revenueStats?.totalDiscountGiven || 0)} />
                             <StatCard label="Free Items Redeemed" value={String(revenueStats?.freeItemsRedeemed || 0)} />
+                            <StatCard label="Unique Customers" value={String(revenueStats?.uniqueCustomerCount || 0)} />
+                            <StatCard label="Repeat Customers" value={String(revenueStats?.repeatCustomerCount || 0)} />
+                        </div>
+
+                        <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] overflow-hidden">
+                            <p className="px-5 pt-4 pb-2 font-bold text-sm">Repeat Customers</p>
+                            {revenueLoading ? (
+                                <p className="px-5 pb-4 text-sm text-[#40484d]">Loading...</p>
+                            ) : repeatCustomers.length === 0 ? (
+                                <p className="px-5 pb-4 text-sm text-[#40484d]">No repeat customers yet — everyone so far has paid only once.</p>
+                            ) : (
+                                <div className="divide-y divide-[#e4e2dc]">
+                                    {repeatCustomers.map(customer => (
+                                        <div key={customer.userId} className="px-5 py-3 flex items-center justify-between text-sm">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold truncate">{customer.name}</p>
+                                                <p className="text-[#70787d] text-xs">{formatCurrency(customer.totalSpent)} total spent</p>
+                                            </div>
+                                            <div className="shrink-0 bg-[#0d6683] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                                {customer.transactionCount} visits
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] overflow-hidden">

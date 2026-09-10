@@ -180,7 +180,7 @@ export default function ScanPage() {
             </header>
 
             {/* Scanner Viewfinder */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-6">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-20">
                 <div className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-3xl border-[3.5px] border-[#B4F82C] shadow-[0_0_16px_rgba(180,248,44,0.45),inset_0_0_12px_rgba(180,248,44,0.25)] overflow-hidden bg-black/10">
                     <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-white/60" />
                     <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-white/60" />

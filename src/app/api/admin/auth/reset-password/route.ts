@@ -1,7 +1,7 @@
-import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
+import { encryptedJson, readEncryptedBody } from '../../../../../../lib/apiCrypto'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
-import { getUsersCollection, getPasswordResetsCollection } from '../../../../../lib/mongodb'
+import { getRestaurantOwnersCollection, getPasswordResetsCollection } from '../../../../../../lib/mongodb'
 
 export async function POST(request: Request) {
     let body: { token?: string; password?: string }
@@ -23,28 +23,28 @@ export async function POST(request: Request) {
     try {
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
         const resets = await getPasswordResetsCollection()
-        // Scoped to accountType so an admin's reset token (if ever leaked
-        // or shared) can never be redeemed against a customer account here.
-        const resetDoc = await resets.findOne({ tokenHash, accountType: 'customer' })
+        // Scoped to accountType so a customer's reset token (if ever leaked
+        // or shared) can never be redeemed against a restaurant account here.
+        const resetDoc = await resets.findOne({ tokenHash, accountType: 'admin' })
 
         if (!resetDoc || resetDoc.expiresAt.getTime() < Date.now()) {
             return encryptedJson({ success: false, error: 'This reset link is invalid or has expired. Please request a new one.' }, { status: 400 })
         }
 
-        const users = await getUsersCollection()
+        const owners = await getRestaurantOwnersCollection()
         const passwordHash = await bcrypt.hash(password, 10)
-        const result = await users.updateOne({ email: resetDoc.userId }, { $set: { passwordHash } })
+        const result = await owners.updateOne({ email: resetDoc.userId }, { $set: { passwordHash } })
 
         if (result.matchedCount === 0) {
             return encryptedJson({ success: false, error: 'Account not found.' }, { status: 404 })
         }
 
         // One-time use — clear any outstanding reset tokens for this account.
-        await resets.deleteMany({ userId: resetDoc.userId, accountType: 'customer' })
+        await resets.deleteMany({ userId: resetDoc.userId, accountType: 'admin' })
 
         return encryptedJson({ success: true })
     } catch (error) {
-        console.error('Reset password error:', error)
+        console.error('Admin reset password error:', error)
         return encryptedJson({ success: false, error: 'Something went wrong. Please try again.' }, { status: 500 })
     }
 }

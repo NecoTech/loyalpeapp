@@ -76,6 +76,11 @@ export type PaymentIntentDocument = {
 
 export type PasswordResetDocument = {
     userId: string // the account's email
+    // Which collection this reset applies to — 'customer' for the users
+    // collection, 'admin' for restaurantOwners. Lets both account types
+    // share the same reset-token store without a token from one ever being
+    // usable against the other's account.
+    accountType: 'customer' | 'admin'
     tokenHash: string
     expiresAt: Date
     createdAt: Date

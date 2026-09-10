@@ -7,6 +7,7 @@ import { Mail, Lock, Store, Eye, EyeOff, ShieldCheck, MapPin } from 'lucide-reac
 import { useAdminAuth } from '../context/AdminAuthContext'
 import { CITIES } from '../context/LocationContext'
 import { cn } from '../../../lib/utils'
+import { secureFetch } from '../../../lib/secureFetch'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
 
@@ -29,12 +30,44 @@ function AdminAuthContent() {
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isRequestingReset, setIsRequestingReset] = useState(false)
+    const [resetMessage, setResetMessage] = useState('')
 
     const switchMode = (next: Mode) => {
         setMode(next)
         setError('')
+        setResetMessage('')
         setPassword('')
         setConfirmPassword('')
+    }
+
+    const handleForgotPassword = async () => {
+        if (isRequestingReset) return
+        setError('')
+        setResetMessage('')
+
+        if (!email.trim()) {
+            setError('Enter your email above first, then tap Forgot Password.')
+            return
+        }
+
+        setIsRequestingReset(true)
+        try {
+            const { data } = await secureFetch('/api/admin/auth/forgot-password', {
+                method: 'POST',
+                body: { email: email.trim() },
+            })
+            if (data?.success) {
+                setResetMessage("If a restaurant account exists for that email, we've sent a password reset link.")
+            } else {
+                setError(data?.error || 'Please try again.')
+            }
+        } catch (err) {
+            console.error('Admin forgot password request failed', err)
+            setError('Please check your connection and try again.')
+        } finally {
+            setIsRequestingReset(false)
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -184,6 +217,17 @@ function AdminAuthContent() {
                         </button>
                     </div>
 
+                    {mode === 'signin' && (
+                        <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            disabled={isRequestingReset}
+                            className="self-end -mt-2 text-sm font-bold text-[#0d6683] hover:underline disabled:opacity-60"
+                        >
+                            {isRequestingReset ? 'Sending...' : 'Forgot Password?'}
+                        </button>
+                    )}
+
                     {mode === 'signup' && (
                         <div className="flex items-center bg-[#f5f4ed] rounded-xl px-4 py-3 border-2 border-transparent focus-within:border-[#0d6683]">
                             <Lock size={18} className="text-[#70787d] mr-3 shrink-0" />
@@ -201,6 +245,9 @@ function AdminAuthContent() {
 
                     {error && (
                         <p className="text-[#ba1a1a] text-sm text-center">{error}</p>
+                    )}
+                    {resetMessage && (
+                        <p className="text-[#0d6683] text-sm text-center font-semibold">{resetMessage}</p>
                     )}
 
                     <button

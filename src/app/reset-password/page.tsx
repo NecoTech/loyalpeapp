@@ -50,6 +50,8 @@ function ResetPasswordContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const token = searchParams.get('token') || ''
+    const isAdmin = searchParams.get('type') === 'admin'
+    const loginPath = isAdmin ? '/admin?mode=signin' : '/auth?mode=login'
 
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -73,7 +75,7 @@ function ResetPasswordContent() {
 
         setIsSubmitting(true)
         try {
-            const { data } = await secureFetch('/api/auth/reset-password', {
+            const { data } = await secureFetch(isAdmin ? '/api/admin/auth/reset-password' : '/api/auth/reset-password', {
                 method: 'POST',
                 body: { token, password },
             })
@@ -105,7 +107,7 @@ function ResetPasswordContent() {
                             </p>
                             <button
                                 type="button"
-                                onClick={() => router.push('/auth?mode=login')}
+                                onClick={() => router.push(loginPath)}
                                 className="mt-4 w-full py-3.5 bg-[#f6bf22] hover:bg-[#ffdf99] text-[#1c1b1b] rounded-xl border-[3px] border-[#1c1b1b] shadow-[4px_4px_0px_#111111] active:translate-x-1 active:translate-y-1 active:shadow-none text-[15px] leading-[18px] tracking-[0.02em] font-extrabold uppercase flex items-center justify-center gap-2 transition-all cursor-pointer"
                             >
                                 Back to Login
@@ -122,7 +124,7 @@ function ResetPasswordContent() {
                             </p>
                             <button
                                 type="button"
-                                onClick={() => router.push('/auth?mode=login')}
+                                onClick={() => router.push(loginPath)}
                                 className="mt-4 w-full py-3.5 bg-[#f6bf22] hover:bg-[#ffdf99] text-[#1c1b1b] rounded-xl border-[3px] border-[#1c1b1b] shadow-[4px_4px_0px_#111111] active:translate-x-1 active:translate-y-1 active:shadow-none text-[15px] leading-[18px] tracking-[0.02em] font-extrabold uppercase flex items-center justify-center gap-2 transition-all cursor-pointer"
                             >
                                 <span>Log In</span>

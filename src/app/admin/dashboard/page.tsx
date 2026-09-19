@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
-import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation } from 'lucide-react'
+import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation, Camera } from 'lucide-react'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { KERALA_CITIES } from '../../../../lib/keralaCities'
 import { cn } from '../../../../lib/utils'
 import { secureFetch } from '../../../../lib/secureFetch'
+import { prepareRestaurantImage } from '../../../../lib/resizeImage'
+import RestaurantPhoto from '../../components/RestaurantPhoto'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['600'] })
@@ -726,202 +728,6 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
     )
 }
 
-function PaymentGatewaySettings({ restaurantId }: { restaurantId: string }) {
-    const [isLoading, setIsLoading] = useState(true)
-    const [configured, setConfigured] = useState(false)
-    const [apiKeyMasked, setApiKeyMasked] = useState('')
-    const [isEditing, setIsEditing] = useState(false)
-
-    const [apiKey, setApiKey] = useState('')
-    const [salt, setSalt] = useState('')
-    const [mode, setMode] = useState<'TEST' | 'LIVE'>('LIVE')
-    const [paymentOptions, setPaymentOptions] = useState('cc,nb,upi,w')
-    const [gatewayUrl, setGatewayUrl] = useState('')
-    const [responseUrl, setResponseUrl] = useState('')
-
-    const [isSaving, setIsSaving] = useState(false)
-    const [error, setError] = useState('')
-    const [saved, setSaved] = useState(false)
-
-    const fetchCredentials = async () => {
-        setIsLoading(true)
-        try {
-            const { data } = await secureFetch(`/api/admin/omniware-credentials?restaurantId=${encodeURIComponent(restaurantId)}`)
-            if (data?.success && data.configured) {
-                setConfigured(true)
-                setApiKeyMasked(data.apiKeyMasked)
-                setMode(data.mode)
-                setPaymentOptions(data.paymentOptions || 'cc,nb,upi,w')
-                setGatewayUrl(data.gatewayUrl || '')
-                setResponseUrl(data.responseUrl || '')
-            } else {
-                setConfigured(false)
-                setIsEditing(true)
-            }
-        } catch (err) {
-            console.error('Error fetching Omniware credentials:', err)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        fetchCredentials()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [restaurantId])
-
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setError('')
-        setSaved(false)
-
-        if (!apiKey.trim() || !salt.trim()) {
-            setError('API key and salt are required.')
-            return
-        }
-
-        setIsSaving(true)
-        try {
-            const { res, data } = await secureFetch('/api/admin/omniware-credentials', {
-                method: 'POST',
-                body: {
-                    restaurantId,
-                    apiKey: apiKey.trim(),
-                    salt: salt.trim(),
-                    mode,
-                    paymentOptions,
-                    gatewayUrl: gatewayUrl.trim(),
-                    responseUrl: responseUrl.trim(),
-                },
-            })
-            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save credentials')
-
-            setSaved(true)
-            setApiKey('')
-            setSalt('')
-            setIsEditing(false)
-            fetchCredentials()
-        } catch (err: any) {
-            setError(err.message || 'Something went wrong. Please try again.')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    if (isLoading) {
-        return <p className="text-sm text-[#40484d]">Loading payment gateway settings...</p>
-    }
-
-    return (
-        <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#0d6683]" />
-                <h3 className="font-bold text-sm">Omniware Payment Gateway</h3>
-            </div>
-
-            {configured && !isEditing ? (
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#40484d]">API Key</span>
-                        <span className={cn(jetbrainsMono.className, "font-bold")}>{apiKeyMasked}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#40484d]">Mode</span>
-                        <span className="font-bold">{mode}</span>
-                    </div>
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="text-sm font-bold text-[#0d6683] text-left"
-                    >
-                        Update credentials
-                    </button>
-                </div>
-            ) : (
-                <form onSubmit={handleSave} className="flex flex-col gap-3">
-                    <p className="text-xs text-[#70787d]">
-                        {configured
-                            ? 'Re-enter both the API key and salt to update them — the salt is never shown back after saving, so partial updates aren’t possible.'
-                            : 'Enter the API key and salt Omniware gave you for this restaurant. The salt is never shown again after saving.'}
-                    </p>
-                    <input
-                        type="text"
-                        placeholder="API Key"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    />
-                    <input
-                        type="password"
-                        placeholder="Salt"
-                        value={salt}
-                        onChange={(e) => setSalt(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    />
-                    <div className="flex bg-white rounded-lg p-1 border border-[#e4e2dc]">
-                        <button
-                            type="button"
-                            onClick={() => setMode('LIVE')}
-                            className={cn("flex-1 py-2 rounded-md text-xs font-bold transition-colors", mode === 'LIVE' ? "bg-[#0d6683] text-white" : "text-[#40484d]")}
-                        >
-                            LIVE
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMode('TEST')}
-                            className={cn("flex-1 py-2 rounded-md text-xs font-bold transition-colors", mode === 'TEST' ? "bg-[#0d6683] text-white" : "text-[#40484d]")}
-                        >
-                            TEST
-                        </button>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Payment options (e.g. cc,nb,upi,w)"
-                        value={paymentOptions}
-                        onChange={(e) => setPaymentOptions(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Gateway URL override (optional)"
-                        value={gatewayUrl}
-                        onChange={(e) => setGatewayUrl(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Response URL override (optional)"
-                        value={responseUrl}
-                        onChange={(e) => setResponseUrl(e.target.value)}
-                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
-                    />
-
-                    {error && <p className="text-[#ba1a1a] text-sm">{error}</p>}
-                    {saved && <p className="text-[#4d6700] text-sm">Saved successfully.</p>}
-
-                    <div className="flex gap-2">
-                        <button
-                            type="submit"
-                            disabled={isSaving}
-                            className="flex-1 bg-[#0d6683] text-white font-bold py-2.5 rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
-                        >
-                            {isSaving ? 'Saving...' : 'Save Credentials'}
-                        </button>
-                        {configured && (
-                            <button
-                                type="button"
-                                onClick={() => { setIsEditing(false); setApiKey(''); setSalt(''); setError('') }}
-                                className="px-4 rounded-full border border-[#e4e2dc] text-[#40484d] font-bold"
-                            >
-                                Cancel
-                            </button>
-                        )}
-                    </div>
-                </form>
-            )}
-        </div>
-    )
-}
-
 function UpiUrlSettings({ restaurantId }: { restaurantId: string }) {
     const [isLoading, setIsLoading] = useState(true)
     const [upiUrl, setUpiUrl] = useState('')
@@ -1037,6 +843,138 @@ function UpiUrlSettings({ restaurantId }: { restaurantId: string }) {
     )
 }
 
+function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantId: string; restaurantName: string }) {
+    const [imageUrl, setImageUrl] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isBusy, setIsBusy] = useState(false)
+    const [error, setError] = useState('')
+    const [message, setMessage] = useState('')
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const { data } = await secureFetch(`/api/restaurant/${encodeURIComponent(restaurantId)}`)
+                if (data?.success) setImageUrl(data.restaurant.imageUrl || null)
+            } catch (err) {
+                console.error('Error fetching restaurant photo:', err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+        load()
+    }, [restaurantId])
+
+    const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        // Reset so choosing the same file again still fires onChange.
+        e.target.value = ''
+        if (!file) return
+
+        setError('')
+        setMessage('')
+        setIsBusy(true)
+        try {
+            const imageBase64 = await prepareRestaurantImage(file)
+            const { res, data } = await secureFetch('/api/admin/restaurant-image', {
+                method: 'POST',
+                body: { restaurantId, imageBase64 },
+            })
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to upload photo')
+            setImageUrl(data.imageUrl)
+            setMessage('Photo updated. Customers will see it right away.')
+        } catch (err: any) {
+            setError(err.message || 'Something went wrong. Please try again.')
+        } finally {
+            setIsBusy(false)
+        }
+    }
+
+    const handleRemove = async () => {
+        setError('')
+        setMessage('')
+        setIsBusy(true)
+        try {
+            const { res, data } = await secureFetch(`/api/admin/restaurant-image?restaurantId=${encodeURIComponent(restaurantId)}`, {
+                method: 'DELETE',
+            })
+            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to remove photo')
+            setImageUrl(null)
+            setMessage('Photo removed.')
+        } catch (err: any) {
+            setError(err.message || 'Something went wrong. Please try again.')
+        } finally {
+            setIsBusy(false)
+        }
+    }
+
+    const initials = restaurantName
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(part => part[0]?.toUpperCase())
+        .join('') || '?'
+
+    return (
+        <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+                <Camera size={18} className="text-[#0d6683]" />
+                <h3 className="font-bold text-sm">Restaurant Photo</h3>
+            </div>
+
+            <div className="flex items-center gap-4">
+                <div className="w-24 h-24 rounded-2xl bg-[#0d6683] text-white border border-[#e4e2dc] overflow-hidden flex items-center justify-center shrink-0 text-3xl font-extrabold">
+                    {isLoading ? null : (
+                        <RestaurantPhoto
+                            src={imageUrl}
+                            alt={`${restaurantName} photo`}
+                            className="w-full h-full object-cover"
+                            fallback={<span>{initials}</span>}
+                        />
+                    )}
+                </div>
+                <div className="flex flex-col gap-2 min-w-0">
+                    <p className="text-xs text-[#70787d]">
+                        Shown to customers next to your restaurant&apos;s name — in the restaurant list, your details page, and their transactions. Square photos or logos work best.
+                    </p>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isBusy || isLoading}
+                            className="bg-[#0d6683] text-white text-sm font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
+                        >
+                            {isBusy ? 'Working...' : imageUrl ? 'Change photo' : 'Upload photo'}
+                        </button>
+                        {imageUrl && (
+                            <button
+                                type="button"
+                                onClick={handleRemove}
+                                disabled={isBusy}
+                                aria-label="Remove photo"
+                                className="px-3 rounded-full border border-[#e4e2dc] text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors disabled:opacity-60"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileChosen}
+                className="hidden"
+            />
+
+            {error && <p className="text-[#ba1a1a] text-sm">{error}</p>}
+            {message && <p className="text-[#4d6700] text-sm">{message}</p>}
+        </div>
+    )
+}
+
 function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
     const [isLoading, setIsLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
@@ -1046,7 +984,9 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
 
     const [address, setAddress] = useState('')
     const [phoneNumber, setPhoneNumber] = useState('')
+    const [category, setCategory] = useState('')
     const [directionsUrl, setDirectionsUrl] = useState('')
+    const [googlePlaceId, setGooglePlaceId] = useState('')
     const [city, setCity] = useState('')
     const [isCityListOpen, setIsCityListOpen] = useState(false)
 
@@ -1057,9 +997,11 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
             if (data?.success) {
                 setAddress(data.address || '')
                 setPhoneNumber(data.phoneNumber || '')
+                setCategory(data.category || '')
                 setDirectionsUrl(data.directionsUrl || '')
+                setGooglePlaceId(data.googlePlaceId || '')
                 setCity(data.city || '')
-                setIsEditing(!data.address && !data.phoneNumber && !data.directionsUrl && !data.city)
+                setIsEditing(!data.address && !data.phoneNumber && !data.directionsUrl && !data.googlePlaceId && !data.category && !data.city)
             }
         } catch (err) {
             console.error('Error fetching restaurant details:', err)
@@ -1086,6 +1028,8 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                     address: address.trim(),
                     phoneNumber: phoneNumber.trim(),
                     directionsUrl: directionsUrl.trim(),
+                    googlePlaceId: googlePlaceId.trim(),
+                    category: category.trim(),
                     city,
                 },
             })
@@ -1093,7 +1037,9 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
 
             setAddress(data.address || '')
             setPhoneNumber(data.phoneNumber || '')
+            setCategory(data.category || '')
             setDirectionsUrl(data.directionsUrl || '')
+            setGooglePlaceId(data.googlePlaceId || '')
             setCity(data.city || '')
             setSaved(true)
             setIsEditing(false)
@@ -1108,7 +1054,7 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
         return <p className="text-sm text-[#40484d]">Loading restaurant details...</p>
     }
 
-    const hasDetails = address || phoneNumber || directionsUrl || city
+    const hasDetails = address || phoneNumber || directionsUrl || googlePlaceId || category || city
 
     const cityQuery = city.trim().toLowerCase()
     const matchingKeralaCities = (cityQuery
@@ -1125,6 +1071,12 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
 
             {hasDetails && !isEditing ? (
                 <div className="flex flex-col gap-3">
+                    {category && (
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className={cn(jetbrainsMono.className, "text-xs text-[#70787d] uppercase tracking-wide")}>Category</span>
+                            <span className="font-bold">{category}</span>
+                        </div>
+                    )}
                     {city && (
                         <div className="flex items-center gap-2 text-sm">
                             <span className={cn(jetbrainsMono.className, "text-xs text-[#70787d] uppercase tracking-wide")}>City</span>
@@ -1149,6 +1101,12 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                             <span className="truncate">{directionsUrl}</span>
                         </div>
                     )}
+                    {googlePlaceId && (
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className={cn(jetbrainsMono.className, "text-xs text-[#70787d] uppercase tracking-wide")}>Place ID</span>
+                            <span className="truncate">{googlePlaceId}</span>
+                        </div>
+                    )}
                     <button
                         onClick={() => setIsEditing(true)}
                         className="text-sm font-bold text-[#0d6683] text-left"
@@ -1160,6 +1118,17 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                 <form onSubmit={handleSave} className="flex flex-col gap-3">
                     <p className="text-xs text-[#70787d]">
                         Shown to customers on your restaurant&apos;s details page. City controls which customers see you when browsing restaurants by location.
+                    </p>
+                    <input
+                        type="text"
+                        placeholder="Business category (e.g. Cafe, Bakery, Salon)"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        maxLength={40}
+                        className="w-full bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
+                    />
+                    <p className="text-[11px] text-[#70787d] -mt-1.5">
+                        Shown under your name on the shops page, where customers can also filter by it. Leave blank to skip.
                     </p>
                     <div className="relative">
                         <input
@@ -1212,6 +1181,17 @@ function RestaurantContactSettings({ restaurantId }: { restaurantId: string }) {
                         onChange={(e) => setDirectionsUrl(e.target.value)}
                         className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
                     />
+                    <input
+                        type="text"
+                        placeholder="Google Place ID (e.g. ChIJ...)"
+                        value={googlePlaceId}
+                        onChange={(e) => setGooglePlaceId(e.target.value)}
+                        autoComplete="off"
+                        className="bg-white rounded-lg px-4 py-2.5 text-sm border border-[#e4e2dc] outline-none focus:border-[#0d6683]"
+                    />
+                    <p className="text-[11px] text-[#70787d] -mt-1.5">
+                        Adds a Review button on your details page that opens your Google review form. Find your Place ID with Google&apos;s Place ID Finder. Leave blank to hide the button.
+                    </p>
 
                     {error && <p className="text-[#ba1a1a] text-sm">{error}</p>}
                     {saved && <p className="text-[#4d6700] text-sm">Saved successfully.</p>}
@@ -1488,7 +1468,7 @@ export default function AdminDashboardPage() {
                     <div className="flex flex-col gap-4">
                         <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
                             <div>
-                                <p className={cn(jetbrainsMono.className, "text-xs uppercase tracking-wide text-[#70787d] font-semibold")}>Restaurant Name</p>
+                                <p className={cn(jetbrainsMono.className, "text-xs uppercase tracking-wide text-[#70787d] font-semibold")}>Business Name</p>
                                 <p className="font-bold">{owner.restaurantName || '—'}</p>
                             </div>
                             <div>
@@ -1501,7 +1481,7 @@ export default function AdminDashboardPage() {
                             </div>
                         </div>
 
-                        {owner.restaurantId && <PaymentGatewaySettings restaurantId={owner.restaurantId} />}
+                        {owner.restaurantId && <RestaurantPhotoSettings restaurantId={owner.restaurantId} restaurantName={owner.restaurantName || 'Your Restaurant'} />}
 
                         {owner.restaurantId && <UpiUrlSettings restaurantId={owner.restaurantId} />}
 

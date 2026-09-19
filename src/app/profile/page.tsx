@@ -290,7 +290,7 @@ export default function ProfilePage() {
                                 icon={<LogOut size={19} />}
                                 iconBg="#ffdad2"
                                 iconColor="#b52603"
-                                label="Log Out of loyalpe"
+                                label="Log Out"
                                 description="Sign out of your account"
                                 labelColor="#b52603"
                                 chevronColor="#b52603"

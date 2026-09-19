@@ -1,5 +1,6 @@
 import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getTransactionsCollection, getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
+import { restaurantImageUrl } from '../../../../../lib/restaurantImage'
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
             ? await owners.find({ restaurantId: { $in: restaurantIds } }).toArray()
             : []
         const nameByRestaurantId = new Map(ownerDocs.map(o => [o.restaurantId, o.restaurantName || o.restaurantId]))
+        const imageUrlByRestaurantId = new Map(ownerDocs.map(o => [o.restaurantId, restaurantImageUrl(o.restaurantId as string, o.profileImageVersion)]))
 
         return encryptedJson({
             success: true,
@@ -50,6 +52,7 @@ export async function GET(request: Request) {
                 id: t._id.toString(),
                 restaurantId: t.restaurantId,
                 restaurantName: nameByRestaurantId.get(t.restaurantId) || t.restaurantId,
+                restaurantImageUrl: imageUrlByRestaurantId.get(t.restaurantId) || null,
                 amount: t.amount,
                 discountAmount: t.discountAmount,
                 discountType: t.discountType,

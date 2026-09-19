@@ -1,5 +1,6 @@
 import { encryptedJson, readEncryptedBody } from '../../../../lib/apiCrypto'
 import { getRestaurantOwnersCollection } from '../../../../lib/mongodb'
+import { restaurantImageUrl } from '../../../../lib/restaurantImage'
 
 /**
  * GET /api/restaurants?city=Bengaluru
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
 
         const results = await owners
             .find(query)
-            .project({ restaurantId: 1, restaurantName: 1, city: 1 })
+            .project({ restaurantId: 1, restaurantName: 1, city: 1, category: 1, profileImageVersion: 1 })
             .toArray()
 
         const restaurants = results
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
                 id: owner.restaurantId as string,
                 name: owner.restaurantName || (owner.restaurantId as string),
                 city: owner.city || null,
+                category: owner.category || null,
+                imageUrl: restaurantImageUrl(owner.restaurantId as string, owner.profileImageVersion),
             }))
             .sort((a, b) => a.name.localeCompare(b.name))
 

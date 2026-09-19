@@ -18,6 +18,19 @@ export type RestaurantOwnerDocument = {
     address?: string
     phoneNumber?: string
     directionsUrl?: string
+    // The restaurant's Google Place ID. The customer-facing Review button
+    // opens Google's write-a-review page for this place (see
+    // lib/googleReview.ts). Set by the owner in the admin Profile tab.
+    googlePlaceId?: string
+    // Set (to the upload time, in ms) when the restaurant has a profile
+    // picture. Used both as the "has an image" flag for list/detail APIs and
+    // as a cache-busting version in the image URL. The picture itself is a
+    // file on disk — see lib/restaurantImageStorage.ts.
+    profileImageVersion?: number
+    // What kind of business this is (e.g. "Cafe", "Bakery") — free text set
+    // by the owner in the admin Profile tab, shown under the name on the
+    // customer-facing shops page.
+    category?: string
     city?: string
     createdAt: Date
     updatedAt?: Date

@@ -8,6 +8,7 @@ import { useLocation, useCityCounts, getCityOptions } from '../context/LocationC
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
+import RestaurantPhoto from '../components/RestaurantPhoto'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '700', '800'] })
 
@@ -15,6 +16,8 @@ type RestaurantSummary = {
     id: string
     name: string
     city: string | null
+    category?: string | null
+    imageUrl?: string | null
 }
 
 function getInitials(name: string) {
@@ -43,16 +46,6 @@ function avatarColor(id: string) {
     for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
     return AVATAR_PALETTE[hash % AVATAR_PALETTE.length]
 }
-
-// Purely visual category chips — this app doesn't have a cuisine/category
-// field on restaurants yet, so only "All" is backed by real data. Matches
-// the source design, which also has no filtering logic wired to these.
-const CATEGORY_CHIPS = [
-    { emoji: '☕', label: 'Cafes & Roasters' },
-    { emoji: '🍕', label: 'Fast Bites' },
-    { emoji: '🥐', label: 'Bakeries' },
-    { emoji: '⚡', label: '20% Off Club' },
-]
 
 export default function RestaurantsPage() {
     const router = useRouter()
@@ -84,11 +77,32 @@ export default function RestaurantsPage() {
         fetchRestaurants()
     }, [selectedCity])
 
+    // One chip per distinct category among the restaurants listed for the
+    // selected city — owners type categories freely, so "Cafe" and "cafe"
+    // are grouped together (shown as first spelled).
+    const categoryChips = useMemo(() => {
+        const groups = new Map<string, { key: string; label: string; count: number }>()
+        for (const r of restaurants) {
+            if (!r.category) continue
+            const key = r.category.toLowerCase()
+            const existing = groups.get(key)
+            if (existing) existing.count += 1
+            else groups.set(key, { key, label: r.category, count: 1 })
+        }
+        return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label))
+    }, [restaurants])
+
+    // A chosen category can vanish (e.g. after switching city) — fall back to All.
+    const selectedCategory = categoryChips.some(c => c.key === activeCategory) ? activeCategory : null
+
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase()
-        if (!q) return restaurants
-        return restaurants.filter(r => r.name.toLowerCase().includes(q))
-    }, [restaurants, query])
+        return restaurants.filter(r => {
+            if (selectedCategory && r.category?.toLowerCase() !== selectedCategory) return false
+            if (!q) return true
+            return r.name.toLowerCase().includes(q) || !!r.category?.toLowerCase().includes(q)
+        })
+    }, [restaurants, query, selectedCategory])
 
     const goToRestaurant = (id: string) => {
         localStorage.setItem('lastVisitedRestaurantId', id)
@@ -170,7 +184,7 @@ export default function RestaurantsPage() {
                             type="text"
                             value={query}
                             onChange={e => setQuery(e.target.value)}
-                            placeholder="Search restaurants, cafes, spots..."
+                            placeholder="Search shops, categories..."
                             className="w-full bg-white text-[#121212] placeholder:text-zinc-500 font-bold text-sm py-3.5 pl-11 pr-4 brutal-border rounded-2xl brutal-shadow focus:outline-none focus:ring-0 transition-all"
                         />
                         <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#121212] pointer-events-none" />
@@ -183,21 +197,21 @@ export default function RestaurantsPage() {
                         onClick={() => setActiveCategory(null)}
                         className={cn(
                             "text-xs font-extrabold px-4 py-2 rounded-full border-2 border-[#121212] brutal-shadow-sm whitespace-nowrap transition-all cursor-pointer",
-                            activeCategory === null ? "bg-[#121212] text-white" : "bg-white text-[#121212] active:translate-y-0.5"
+                            selectedCategory === null ? "bg-[#121212] text-white" : "bg-white text-[#121212] active:translate-y-0.5"
                         )}
                     >
                         🔥 All ({restaurants.length})
                     </button>
-                    {CATEGORY_CHIPS.map(chip => (
+                    {categoryChips.map(chip => (
                         <button
-                            key={chip.label}
-                            onClick={() => setActiveCategory(chip.label)}
+                            key={chip.key}
+                            onClick={() => setActiveCategory(chip.key)}
                             className={cn(
                                 "text-xs font-extrabold px-3.5 py-2 rounded-full border-2 border-[#121212] brutal-shadow-sm whitespace-nowrap transition-all cursor-pointer",
-                                activeCategory === chip.label ? "bg-[#C5F646] text-[#121212]" : "bg-white text-[#121212] active:translate-y-0.5"
+                                selectedCategory === chip.key ? "bg-[#C5F646] text-[#121212]" : "bg-white text-[#121212] active:translate-y-0.5"
                             )}
                         >
-                            {chip.emoji} {chip.label}
+                            {chip.label} ({chip.count})
                         </button>
                     ))}
                 </section>
@@ -229,13 +243,18 @@ export default function RestaurantsPage() {
                                         className="bg-white brutal-border rounded-2xl p-4 flex flex-col items-center justify-center text-center brutal-shadow-card brutal-press transition-all hover:bg-zinc-50 cursor-pointer"
                                     >
                                         <div
-                                            className="w-14 h-14 rounded-full border-2 border-[#121212] flex items-center justify-center font-black text-base brutal-shadow-sm mb-3"
+                                            className="w-14 h-14 rounded-full border-2 border-[#121212] flex items-center justify-center font-black text-base brutal-shadow-sm mb-3 overflow-hidden"
                                             style={{ backgroundColor: colors.bg, color: colors.text }}
                                         >
-                                            {getInitials(restaurant.name)}
+                                            <RestaurantPhoto
+                                                src={restaurant.imageUrl}
+                                                alt={restaurant.name}
+                                                className="w-full h-full object-cover"
+                                                fallback={<>{getInitials(restaurant.name)}</>}
+                                            />
                                         </div>
                                         <h3 className="font-extrabold text-sm text-[#121212] tracking-tight leading-snug">{restaurant.name}</h3>
-                                        <span className="mt-1 text-[11px] font-bold text-zinc-500">Partner Restaurant</span>
+                                        <span className="mt-1 text-[11px] font-bold text-zinc-500">{restaurant.category || 'Partner Restaurant'}</span>
                                         <span className="mt-3 w-full py-1.5 px-3 bg-zinc-100 border-2 border-[#121212] rounded-lg brutal-shadow-sm text-xs font-black text-[#121212] flex items-center justify-center gap-1">
                                             View Card
                                         </span>

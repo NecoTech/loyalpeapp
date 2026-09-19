@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
 import { verifyPendingUpiPayment } from '../../../lib/pendingUpiPayment'
+import RestaurantPhoto from '../components/RestaurantPhoto'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'] })
@@ -28,6 +29,7 @@ type Transaction = {
     id: string
     restaurantId: string
     restaurantName: string
+    restaurantImageUrl?: string | null
     amount: number
     discountAmount: number
     discountType?: 'percentage' | 'flat'
@@ -305,10 +307,15 @@ export default function TransactionsPage() {
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex items-center gap-3">
                                                     <div
-                                                        className="w-12 h-12 rounded-xl neo-border neo-shadow-badge flex items-center justify-center shrink-0"
+                                                        className="w-12 h-12 rounded-xl neo-border neo-shadow-badge flex items-center justify-center shrink-0 overflow-hidden"
                                                         style={{ backgroundColor: visual.color }}
                                                     >
-                                                        <Icon size={24} className="text-[#111111]" />
+                                                        <RestaurantPhoto
+                                                            src={transaction.restaurantImageUrl}
+                                                            alt={transaction.restaurantName}
+                                                            className="w-full h-full object-cover"
+                                                            fallback={<Icon size={24} className="text-[#111111]" />}
+                                                        />
                                                     </div>
                                                     <div>
                                                         <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">
@@ -390,10 +397,15 @@ export default function TransactionsPage() {
                         <div className="bg-white neo-border rounded-xl p-4 neo-shadow-1 mb-4">
                             <div className="flex items-center gap-3 pb-3 border-b-2 border-dashed border-[#c4c5d9]">
                                 <div
-                                    className="w-12 h-12 rounded-xl neo-border flex items-center justify-center"
+                                    className="w-12 h-12 rounded-xl neo-border flex items-center justify-center overflow-hidden"
                                     style={{ backgroundColor: activeVisual.color }}
                                 >
-                                    <activeVisual.Icon size={24} className="text-[#111111]" />
+                                    <RestaurantPhoto
+                                        src={activeTransaction.restaurantImageUrl}
+                                        alt={activeTransaction.restaurantName}
+                                        className="w-full h-full object-cover"
+                                        fallback={<activeVisual.Icon size={24} className="text-[#111111]" />}
+                                    />
                                 </div>
                                 <div>
                                     <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">{activeTransaction.restaurantName}</h3>

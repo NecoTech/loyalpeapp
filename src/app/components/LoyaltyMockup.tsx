@@ -8,6 +8,7 @@ import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
 import { readPendingUpiPayment, writePendingUpiPayment, clearPendingUpiPayment } from '../../../lib/pendingUpiPayment'
 import { useAuth } from '../context/AuthContext'
+import RestaurantPhoto from './RestaurantPhoto'
 import Image from "next/image"
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
@@ -15,6 +16,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', 
 type RestaurantDetails = {
     id: string
     name: string
+    imageUrl?: string | null
 }
 
 type LoyaltyRewardItem = {
@@ -717,8 +719,13 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                 <main className="flex-1 flex flex-col items-center justify-center my-2">
                     <div className="flex flex-col items-center mb-5">
                         <div className="relative mb-3">
-                            <div className="w-16 h-16 rounded-2xl bg-[#D8B4FE] border-2 border-[#111111] keypad-shadow flex items-center justify-center">
-                                <Store size={32} strokeWidth={2} />
+                            <div className="w-16 h-16 rounded-2xl bg-[#D8B4FE] border-2 border-[#111111] keypad-shadow flex items-center justify-center overflow-hidden">
+                                <RestaurantPhoto
+                                    src={restaurant?.imageUrl}
+                                    alt={restaurant?.name ?? 'Restaurant'}
+                                    className="w-full h-full object-cover"
+                                    fallback={<Store size={32} strokeWidth={2} />}
+                                />
                             </div>
                             <div aria-label="Loyalty partner" className="absolute -bottom-1 -right-1.5 bg-[#D2F843] border-2 border-[#111111] rounded-full w-5 h-5 flex items-center justify-center">
                                 <Check size={12} strokeWidth={3} />
@@ -1183,8 +1190,13 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
                             {/* Step 2: merchant info */}
                             <div className="seq-step-2 w-full max-w-sm bg-white border-[3px] border-[#111111] rounded-2xl p-3 shadow-[4px_4px_0px_#111111] mt-2.5 flex items-center gap-3 text-left">
-                                <div className="w-12 h-12 rounded-xl bg-[#2e5bff] border-[3px] border-[#111111] shadow-[2px_2px_0px_#111111] flex items-center justify-center text-[18px] font-extrabold text-white shrink-0">
-                                    {restaurant ? getInitials(restaurant.name) : '—'}
+                                <div className="w-12 h-12 rounded-xl bg-[#2e5bff] border-[3px] border-[#111111] shadow-[2px_2px_0px_#111111] flex items-center justify-center text-[18px] font-extrabold text-white shrink-0 overflow-hidden">
+                                    <RestaurantPhoto
+                                        src={restaurant?.imageUrl}
+                                        alt={restaurant?.name ?? 'Restaurant'}
+                                        className="w-full h-full object-cover"
+                                        fallback={<>{restaurant ? getInitials(restaurant.name) : '—'}</>}
+                                    />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">

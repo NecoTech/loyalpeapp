@@ -12,7 +12,7 @@ import Login from '..//../components/Login'
 // import Register from '..//../components/Register'
 import { cn } from '..//..//..//..//lib/utils'
 import { secureFetch } from '..//..//..//..//lib/secureFetch'
-import { PulseLoader } from "react-spinners";
+import PageLoader from '../../components/PageLoader'
 import { Search } from 'lucide-react'
 
 type Restaurant = {
@@ -222,14 +222,7 @@ function RestaurantContent() {
 
     // Show loading state
     if (isLoading) {
-        return (
-            <div className={cn(
-                "min-h-screen flex items-center justify-center",
-                "bg-gray-50 dark:bg-zinc-900 text-zinc-900 dark:text-white"
-            )}>
-                <PulseLoader color="#FF385C" />
-            </div>
-        )
+        return <PageLoader />
     }
 
     // Show error if restaurant data failed to load (but not 404)

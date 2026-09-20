@@ -39,7 +39,7 @@ function CartContent() {
     return (
         <div className={cn(
             "min-h-screen",
-            "bg-gray-50 text-zinc-900",
+            "bg-white text-zinc-900",
             "dark:bg-zinc-900 dark:text-white"
         )}>
             {/* Header */}

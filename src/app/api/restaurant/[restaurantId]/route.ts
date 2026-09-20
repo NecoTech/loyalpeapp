@@ -1,7 +1,7 @@
 import { encryptedJson, readEncryptedBody } from '../../../../../lib/apiCrypto'
 import { getRestaurantOwnersCollection } from '../../../../../lib/mongodb'
 import { googleReviewUrl } from '../../../../../lib/googleReview'
-import { restaurantImageUrl } from '../../../../../lib/restaurantImage'
+import { restaurantBannerUrl, restaurantImageUrl } from '../../../../../lib/restaurantImage'
 
 export async function GET(request: Request, { params }: { params: Promise<{ restaurantId: string }> }) {
     const { restaurantId } = await params
@@ -29,6 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ rest
                 directionsUrl: owner.directionsUrl || null,
                 reviewUrl: owner.googlePlaceId ? googleReviewUrl(owner.googlePlaceId) : null,
                 imageUrl: restaurantImageUrl(normalizedId, owner.profileImageVersion),
+                bannerUrl: restaurantBannerUrl(normalizedId, owner.bannerImageVersion),
             },
         })
     } catch (error) {

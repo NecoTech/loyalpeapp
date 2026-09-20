@@ -380,7 +380,7 @@ export default function OnboardingPage() {
                     <div className="absolute inset-0" onClick={closeCityModal} />
                     <div
                         className={cn(
-                            "onboarding-modal-content relative w-full max-w-md bg-[#FFFDF0] text-black border-t-[4px] sm:border-[4px] border-black rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_-6px_0_0_#000] sm:shadow-[0_6px_0_0_#000] z-10 max-h-[85vh] flex flex-col overflow-hidden",
+                            "onboarding-modal-content relative w-full max-w-md bg-white text-black border-t-[4px] sm:border-[4px] border-black rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_-6px_0_0_#000] sm:shadow-[0_6px_0_0_#000] z-10 max-h-[85vh] flex flex-col overflow-hidden",
                             isCityModalVisible ? "translate-y-0 scale-100 opacity-100" : "translate-y-5 scale-95 opacity-0"
                         )}
                     >

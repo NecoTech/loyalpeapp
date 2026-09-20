@@ -463,7 +463,7 @@ function LoyaltyPageContent() {
 
     return (
         <div className={cn(hankenGrotesk.className, "h-screen flex flex-col bg-white text-[#1b1c18] overflow-hidden max-w-md mx-auto md:shadow-2xl md:my-8 md:rounded-[1.5rem] relative")}>
-            <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-[#fbf9f2]">
+            <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-white">
                 <ShaderBackground fragmentSource={LOYALTY_SHADER_FRAGMENT_SOURCE} />
 
                 <button

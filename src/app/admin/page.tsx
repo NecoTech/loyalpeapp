@@ -99,7 +99,7 @@ function AdminAuthContent() {
     }
 
     return (
-        <div className={cn(hankenGrotesk.className, "bg-[#fbf9f2] min-h-screen flex flex-col items-center justify-center px-6 py-12 text-[#1b1c18]")}>
+        <div className={cn(hankenGrotesk.className, "bg-white min-h-screen flex flex-col items-center justify-center px-6 py-12 text-[#1b1c18]")}>
             <div className="w-full max-w-sm">
                 <div className="text-center mb-8">
                     <div className="w-14 h-14 rounded-full bg-[#0d6683] text-white flex items-center justify-center mx-auto mb-4">
@@ -278,7 +278,7 @@ function AdminAuthContent() {
 
 export default function AdminAuthPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-[#fbf9f2]" />}>
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
             <AdminAuthContent />
         </Suspense>
     )

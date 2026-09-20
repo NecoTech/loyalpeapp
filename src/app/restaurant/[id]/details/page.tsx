@@ -19,6 +19,7 @@ type RestaurantDetails = {
     directionsUrl?: string | null
     reviewUrl?: string | null
     imageUrl?: string | null
+    bannerUrl?: string | null
 }
 
 const ACTION_GRID_COLS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' }
@@ -254,7 +255,7 @@ export default function RestaurantDetailsPage() {
     const actionCount = [restaurant?.directionsUrl, restaurant?.phoneNumber, restaurant?.reviewUrl].filter(Boolean).length
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#F6F8FA] text-zinc-900 flex justify-center selection:bg-lime-300")}>
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-white text-zinc-900 flex justify-center selection:bg-lime-300")}>
             <div className="w-full max-w-md min-h-screen bg-white flex flex-col relative pb-28">
                 {/* Top Bar */}
                 <header className="pt-4 pb-2 px-5 flex items-center justify-between sticky top-0 z-30 bg-white/95 backdrop-blur-md">
@@ -274,19 +275,30 @@ export default function RestaurantDetailsPage() {
                     {/* Hero */}
                     <section className="relative">
                         <div className="w-full h-48 sm:h-52 rounded-3xl bg-gradient-to-br from-[#A2C7FE] via-[#B8D3FE] to-[#DEC6FF] border-2 border-black shop-shadow flex items-center justify-center relative overflow-hidden">
-                            <div className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full border-4 border-white/25 pointer-events-none" />
-                            <div className="absolute -left-6 -top-6 w-28 h-28 rounded-full border-4 border-white/20 pointer-events-none" />
+                            {/* The restaurant's banner fills the hero when it has one;
+                                otherwise (or if it fails to load) the default hero below. */}
                             <RestaurantPhoto
-                                src={restaurant?.imageUrl}
-                                alt={restaurant?.name ?? 'Restaurant'}
-                                className="relative z-10 w-36 h-36 rounded-3xl border-2 border-black shop-shadow object-cover bg-white"
-                                fallback={initials ? (
-                                    <span className="text-white text-6xl sm:text-7xl font-black tracking-tight select-none drop-shadow-sm">
-                                        {initials}
-                                    </span>
-                                ) : (
-                                    <Store size={56} className="text-white/90" />
-                                )}
+                                src={restaurant?.bannerUrl}
+                                alt={`${restaurant?.name ?? 'Restaurant'} banner`}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                fallback={
+                                    <>
+                                        <div className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full border-4 border-white/25 pointer-events-none" />
+                                        <div className="absolute -left-6 -top-6 w-28 h-28 rounded-full border-4 border-white/20 pointer-events-none" />
+                                        <RestaurantPhoto
+                                            src={restaurant?.imageUrl}
+                                            alt={restaurant?.name ?? 'Restaurant'}
+                                            className="relative z-10 w-36 h-36 rounded-3xl border-2 border-black shop-shadow object-cover bg-white"
+                                            fallback={initials ? (
+                                                <span className="text-white text-6xl sm:text-7xl font-black tracking-tight select-none drop-shadow-sm">
+                                                    {initials}
+                                                </span>
+                                            ) : (
+                                                <Store size={56} className="text-white/90" />
+                                            )}
+                                        />
+                                    </>
+                                }
                             />
                         </div>
                     </section>

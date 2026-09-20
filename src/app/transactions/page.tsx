@@ -224,9 +224,9 @@ export default function TransactionsPage() {
     const activeVisual = activeTransaction ? getMerchantVisual(activeTransaction.restaurantName) : null
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col bg-[#fcf9f8] text-[#1c1b1b] pb-10")}>
+        <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col bg-white text-[#1c1b1b] pb-10")}>
             {/* Top App Bar */}
-            <header className="sticky top-0 z-30 bg-[#fcf9f8] border-b-[3px] border-[#111111] px-4 py-3 flex items-center gap-3 shadow-[0px_3px_0px_#111111]">
+            <header className="sticky top-0 z-30 bg-white border-b-[3px] border-[#111111] px-4 py-3 flex items-center gap-3 shadow-[0px_3px_0px_#111111]">
                 <button
                     aria-label="Go Back"
                     onClick={() => router.back()}
@@ -375,7 +375,7 @@ export default function TransactionsPage() {
                 >
                     <div
                         className={cn(
-                            "w-full max-w-[428px] bg-[#fcf9f8] neo-border border-b-0 rounded-t-2xl p-5 shadow-[0px_-4px_0px_#111111] transform transition-transform duration-200 ease-out",
+                            "w-full max-w-[428px] bg-white neo-border border-b-0 rounded-t-2xl p-5 shadow-[0px_-4px_0px_#111111] transform transition-transform duration-200 ease-out",
                             isDrawerVisible ? "translate-y-0" : "translate-y-full"
                         )}
                     >

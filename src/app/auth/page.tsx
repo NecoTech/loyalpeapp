@@ -213,12 +213,12 @@ function AuthContent() {
     }
 
     if (!isInitialized || user) {
-        return <div className="min-h-screen bg-[#fcf9f8]" />
+        return <div className="min-h-screen bg-white" />
     }
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#f4efe6] text-[#1c1b1b] flex flex-col items-center justify-start")}>
-            <div className="w-full max-w-[428px] min-h-screen bg-[#fcf9f8] flex flex-col relative pb-8 border-x-[3px] border-[#1c1b1b]">
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-white text-[#1c1b1b] flex flex-col items-center justify-start")}>
+            <div className="w-full max-w-[428px] min-h-screen bg-white flex flex-col relative pb-8 border-x-[3px] border-[#1c1b1b]">
                 {/* Segmented Tabs */}
                 <div className="px-4 pt-5">
                     <div className="bg-white p-1.5 rounded-2xl border-[3px] border-[#1c1b1b] shadow-[3px_3px_0px_#111111] flex items-center gap-1.5">
@@ -398,7 +398,7 @@ function AuthContent() {
 
 export default function AuthPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-[#f4efe6]" />}>
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
             <AuthContent />
         </Suspense>
     )

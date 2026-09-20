@@ -934,7 +934,7 @@ export default function Payment() {
         return (
             <div className={cn(
                 "min-h-screen flex items-center justify-center",
-                "bg-gray-50 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+                "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white"
             )}>
                 <PulseLoader color="#FF385C" />
             </div>

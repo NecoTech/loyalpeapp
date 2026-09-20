@@ -683,7 +683,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     const isSliding = isFetchingUpiIntent || isPaying
 
     return (
-        <div className={cn(plusJakartaSans.className, "bg-[#FBF9F5] text-[#111111] min-h-screen flex flex-col justify-between antialiased relative overflow-x-hidden max-w-md mx-auto")}>
+        <div className={cn(plusJakartaSans.className, "bg-white text-[#111111] min-h-screen flex flex-col justify-between antialiased relative overflow-x-hidden max-w-md mx-auto")}>
             <div className="w-full flex flex-col justify-between p-4 sm:p-5 pb-7 flex-1 relative">
                 {/* Top Bar */}
                 <header className="flex items-center justify-between pt-2 pb-1">
@@ -833,7 +833,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                     <div className="absolute inset-0 bg-[#111111]/60 backdrop-blur-sm cursor-pointer" onClick={closeDrawer} />
                     <div
                         className={cn(
-                            "relative w-full max-w-md mx-auto bg-[#FBF9F5] border-t-[3px] border-x-[3px] border-[#111111] rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.25)] flex flex-col max-h-[88vh] z-10 transform transition-transform duration-300 ease-out",
+                            "relative w-full max-w-md mx-auto bg-white border-t-[3px] border-x-[3px] border-[#111111] rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.25)] flex flex-col max-h-[88vh] z-10 transform transition-transform duration-300 ease-out",
                             isDrawerVisible ? "translate-y-0" : "translate-y-full"
                         )}
                     >
@@ -1097,10 +1097,10 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
             {/* Payment Success Celebration */}
             {paymentResult && (
-                <div key={celebrationKey} className="fixed inset-0 z-[100] bg-[#fcf9f8] overflow-y-auto flex justify-center">
+                <div key={celebrationKey} className="fixed inset-0 z-[100] bg-white overflow-y-auto flex justify-center">
                     <div className="w-full max-w-[428px] min-h-full flex flex-col relative pb-8">
                         {/* Top Bar */}
-                        <header className="flex justify-between items-center w-full px-4 py-3 z-30 sticky top-0 bg-[#fcf9f8]/90 backdrop-blur-sm">
+                        <header className="flex justify-between items-center w-full px-4 py-3 z-30 sticky top-0 bg-white/90 backdrop-blur-sm">
                             <button
                                 aria-label="Close"
                                 onClick={() => setPaymentResult(null)}

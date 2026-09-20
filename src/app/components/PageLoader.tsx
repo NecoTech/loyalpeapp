@@ -1,7 +1,7 @@
 export default function PageLoader() {
     return (
         <div
-            className="min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#fcf9f8] text-[#111111]"
+            className="min-h-screen flex flex-col items-center justify-center overflow-hidden bg-white text-[#111111]"
             role="status"
             aria-label="Loading"
         >

@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
-import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation, Camera } from 'lucide-react'
+import { TrendingUp, Wallet, CreditCard, User, Store, LogOut, Plus, Gift, Percent, Trash2, X, Pencil, Check, Eye, QrCode, ShieldCheck, MapPin, Navigation, Camera, Image as ImageIcon } from 'lucide-react'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { KERALA_CITIES } from '../../../../lib/keralaCities'
 import { cn } from '../../../../lib/utils'
 import { secureFetch } from '../../../../lib/secureFetch'
-import { prepareRestaurantImage } from '../../../../lib/resizeImage'
+import { prepareRestaurantBanner, prepareRestaurantImage } from '../../../../lib/resizeImage'
 import RestaurantPhoto from '../../components/RestaurantPhoto'
 
 const hankenGrotesk = Hanken_Grotesk({ subsets: ['latin'], weight: ['500', '700', '800'] })
@@ -658,7 +658,7 @@ function LoyaltyCardsTab({ restaurantId, restaurantName }: { restaurantId: strin
             {/* Live Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-[#fbf9f2] rounded-2xl flex flex-col max-h-[85vh]">
+                    <div className="w-full max-w-sm bg-white rounded-2xl flex flex-col max-h-[85vh]">
                         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                             <p className="font-bold text-sm flex items-center gap-2 text-[#1b1c18]">
                                 <Eye size={16} className="text-[#67558c]" />
@@ -843,7 +843,35 @@ function UpiUrlSettings({ restaurantId }: { restaurantId: string }) {
     )
 }
 
-function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantId: string; restaurantName: string }) {
+type RestaurantImageKind = 'profile' | 'banner'
+
+// The two uploadable pictures share one card: same flow (pick, resize in the
+// browser, upload, replace or remove) — they differ in shape, where they show
+// up for customers, and which field of the public restaurant record has them.
+const IMAGE_KIND_CONFIG = {
+    profile: {
+        title: 'Restaurant Photo',
+        icon: Camera,
+        description: "Shown to customers next to your restaurant's name — in the restaurant list, your details page, and their transactions. Square photos or logos work best.",
+        urlField: 'imageUrl',
+        prepare: prepareRestaurantImage,
+        noun: 'photo',
+    },
+    banner: {
+        title: 'Banner Image',
+        icon: ImageIcon,
+        description: "The wide picture at the top of your restaurant's details page. Landscape photos work best — it's cropped to a 2:1 shape.",
+        urlField: 'bannerUrl',
+        prepare: prepareRestaurantBanner,
+        noun: 'banner',
+    },
+} as const
+
+function RestaurantImageSettings({ restaurantId, restaurantName, kind }: { restaurantId: string; restaurantName: string; kind: RestaurantImageKind }) {
+    const config = IMAGE_KIND_CONFIG[kind]
+    const Icon = config.icon
+    const isBanner = kind === 'banner'
+
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isBusy, setIsBusy] = useState(false)
@@ -855,15 +883,15 @@ function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantI
         const load = async () => {
             try {
                 const { data } = await secureFetch(`/api/restaurant/${encodeURIComponent(restaurantId)}`)
-                if (data?.success) setImageUrl(data.restaurant.imageUrl || null)
+                if (data?.success) setImageUrl(data.restaurant[config.urlField] || null)
             } catch (err) {
-                console.error('Error fetching restaurant photo:', err)
+                console.error(`Error fetching restaurant ${config.noun}:`, err)
             } finally {
                 setIsLoading(false)
             }
         }
         load()
-    }, [restaurantId])
+    }, [restaurantId, config])
 
     const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -875,14 +903,14 @@ function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantI
         setMessage('')
         setIsBusy(true)
         try {
-            const imageBase64 = await prepareRestaurantImage(file)
+            const imageBase64 = await config.prepare(file)
             const { res, data } = await secureFetch('/api/admin/restaurant-image', {
                 method: 'POST',
-                body: { restaurantId, imageBase64 },
+                body: { restaurantId, imageBase64, kind },
             })
-            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to upload photo')
+            if (!res.ok || !data?.success) throw new Error(data?.error || `Failed to upload ${config.noun}`)
             setImageUrl(data.imageUrl)
-            setMessage('Photo updated. Customers will see it right away.')
+            setMessage(`${isBanner ? 'Banner' : 'Photo'} updated. Customers will see it right away.`)
         } catch (err: any) {
             setError(err.message || 'Something went wrong. Please try again.')
         } finally {
@@ -895,12 +923,12 @@ function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantI
         setMessage('')
         setIsBusy(true)
         try {
-            const { res, data } = await secureFetch(`/api/admin/restaurant-image?restaurantId=${encodeURIComponent(restaurantId)}`, {
+            const { res, data } = await secureFetch(`/api/admin/restaurant-image?restaurantId=${encodeURIComponent(restaurantId)}&kind=${kind}`, {
                 method: 'DELETE',
             })
-            if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to remove photo')
+            if (!res.ok || !data?.success) throw new Error(data?.error || `Failed to remove ${config.noun}`)
             setImageUrl(null)
-            setMessage('Photo removed.')
+            setMessage(`${isBanner ? 'Banner' : 'Photo'} removed.`)
         } catch (err: any) {
             setError(err.message || 'Something went wrong. Please try again.')
         } finally {
@@ -915,51 +943,67 @@ function RestaurantPhotoSettings({ restaurantId, restaurantName }: { restaurantI
         .map(part => part[0]?.toUpperCase())
         .join('') || '?'
 
+    const preview = isLoading ? null : (
+        <RestaurantPhoto
+            src={imageUrl}
+            alt={`${restaurantName} ${config.noun}`}
+            className="w-full h-full object-cover"
+            fallback={isBanner
+                ? <span className="text-xs font-bold text-[#40484d]/70">No banner yet</span>
+                : <span>{initials}</span>}
+        />
+    )
+
+    const actions = (
+        <div className="flex gap-2">
+            <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy || isLoading}
+                className="bg-[#0d6683] text-white text-sm font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+                {isBusy ? 'Working...' : imageUrl ? `Change ${config.noun}` : `Upload ${config.noun}`}
+            </button>
+            {imageUrl && (
+                <button
+                    type="button"
+                    onClick={handleRemove}
+                    disabled={isBusy}
+                    aria-label={`Remove ${config.noun}`}
+                    className="px-3 rounded-full border border-[#e4e2dc] text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors disabled:opacity-60"
+                >
+                    <Trash2 size={16} />
+                </button>
+            )}
+        </div>
+    )
+
     return (
         <div className="bg-[#f5f4ed] rounded-xl border border-[#e4e2dc] p-5 flex flex-col gap-3">
             <div className="flex items-center gap-2">
-                <Camera size={18} className="text-[#0d6683]" />
-                <h3 className="font-bold text-sm">Restaurant Photo</h3>
+                <Icon size={18} className="text-[#0d6683]" />
+                <h3 className="font-bold text-sm">{config.title}</h3>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-2xl bg-[#0d6683] text-white border border-[#e4e2dc] overflow-hidden flex items-center justify-center shrink-0 text-3xl font-extrabold">
-                    {isLoading ? null : (
-                        <RestaurantPhoto
-                            src={imageUrl}
-                            alt={`${restaurantName} photo`}
-                            className="w-full h-full object-cover"
-                            fallback={<span>{initials}</span>}
-                        />
-                    )}
+            {isBanner ? (
+                <div className="flex flex-col gap-3">
+                    <div className="w-full aspect-[2/1] rounded-2xl bg-gradient-to-br from-[#A2C7FE] via-[#B8D3FE] to-[#DEC6FF] border border-[#e4e2dc] overflow-hidden flex items-center justify-center">
+                        {preview}
+                    </div>
+                    <p className="text-xs text-[#70787d]">{config.description}</p>
+                    {actions}
                 </div>
-                <div className="flex flex-col gap-2 min-w-0">
-                    <p className="text-xs text-[#70787d]">
-                        Shown to customers next to your restaurant&apos;s name — in the restaurant list, your details page, and their transactions. Square photos or logos work best.
-                    </p>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isBusy || isLoading}
-                            className="bg-[#0d6683] text-white text-sm font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
-                        >
-                            {isBusy ? 'Working...' : imageUrl ? 'Change photo' : 'Upload photo'}
-                        </button>
-                        {imageUrl && (
-                            <button
-                                type="button"
-                                onClick={handleRemove}
-                                disabled={isBusy}
-                                aria-label="Remove photo"
-                                className="px-3 rounded-full border border-[#e4e2dc] text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors disabled:opacity-60"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        )}
+            ) : (
+                <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 rounded-2xl bg-[#0d6683] text-white border border-[#e4e2dc] overflow-hidden flex items-center justify-center shrink-0 text-3xl font-extrabold">
+                        {preview}
+                    </div>
+                    <div className="flex flex-col gap-2 min-w-0">
+                        <p className="text-xs text-[#70787d]">{config.description}</p>
+                        {actions}
                     </div>
                 </div>
-            </div>
+            )}
 
             <input
                 ref={fileInputRef}
@@ -1308,7 +1352,7 @@ export default function AdminDashboardPage() {
     }
 
     return (
-        <div className={cn(hankenGrotesk.className, "bg-[#fbf9f2] min-h-screen text-[#1b1c18] pb-24")}>
+        <div className={cn(hankenGrotesk.className, "bg-white min-h-screen text-[#1b1c18] pb-24")}>
             {/* Header */}
             <header className="px-6 pt-8 pb-4 max-w-md mx-auto flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-[#0d6683] text-white flex items-center justify-center shrink-0">
@@ -1481,7 +1525,9 @@ export default function AdminDashboardPage() {
                             </div>
                         </div>
 
-                        {owner.restaurantId && <RestaurantPhotoSettings restaurantId={owner.restaurantId} restaurantName={owner.restaurantName || 'Your Restaurant'} />}
+                        {owner.restaurantId && <RestaurantImageSettings restaurantId={owner.restaurantId} restaurantName={owner.restaurantName || 'Your Restaurant'} kind="profile" />}
+
+                        {owner.restaurantId && <RestaurantImageSettings restaurantId={owner.restaurantId} restaurantName={owner.restaurantName || 'Your Restaurant'} kind="banner" />}
 
                         {owner.restaurantId && <UpiUrlSettings restaurantId={owner.restaurantId} />}
 
@@ -1499,7 +1545,7 @@ export default function AdminDashboardPage() {
             </main>
 
             {/* Bottom Tab Bar */}
-            <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#fbf9f2]/95 backdrop-blur-sm border-t border-[#e4e2dc] px-6 py-3">
+            <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t border-[#e4e2dc] px-6 py-3">
                 <div className="max-w-md mx-auto flex bg-[#f0eee7] rounded-full p-1">
                     {TABS.map(tab => {
                         const Icon = tab.icon

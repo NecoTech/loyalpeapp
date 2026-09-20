@@ -93,8 +93,8 @@ function ResetPasswordContent() {
     }
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#f4efe6] text-[#1c1b1b] flex flex-col items-center justify-start")}>
-            <div className="w-full max-w-[428px] min-h-screen bg-[#fcf9f8] flex flex-col relative pb-8 border-x-[3px] border-[#1c1b1b]">
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-white text-[#1c1b1b] flex flex-col items-center justify-start")}>
+            <div className="w-full max-w-[428px] min-h-screen bg-white flex flex-col relative pb-8 border-x-[3px] border-[#1c1b1b]">
                 <main className="flex-1 px-4 pt-10 pb-5 flex flex-col">
                     {!token ? (
                         <section className="flex flex-col items-center text-center gap-3 pt-10">
@@ -180,7 +180,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-[#f4efe6]" />}>
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
             <ResetPasswordContent />
         </Suspense>
     )

@@ -30,14 +30,15 @@ import {
     Award,
     Shield,
     ShieldCheck,
+    Info,
+    MapPin,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from '../../../lib/utils'
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../../../lib/support'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
-const SUPPORT_EMAIL = 'odertechnology@gmail.com'
-const SUPPORT_PHONE = '7736570463'
 
 function getInitials(name?: string) {
     if (!name) return '?'
@@ -87,7 +88,7 @@ function SettingsRow({
     iconBg: string
     iconColor: string
     label: string
-    description: string
+    description?: string
     labelColor?: string
     chevronColor?: string
     onClick: () => void
@@ -108,7 +109,9 @@ function SettingsRow({
                 </div>
                 <div>
                     <p className="text-[13px] leading-4 tracking-[0.03em] font-extrabold" style={{ color: labelColor }}>{label}</p>
-                    <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656]">{description}</p>
+                    {description && (
+                        <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656]">{description}</p>
+                    )}
                 </div>
             </div>
             <ChevronRight size={20} style={{ color: chevronColor }} />
@@ -135,6 +138,7 @@ export default function ProfilePage() {
     const [isLogoutOpen, setIsLogoutOpen] = useState(false)
     const [isContactOpen, setIsContactOpen] = useState(false)
     const [isTermsOpen, setIsTermsOpen] = useState(false)
+    const [isAboutOpen, setIsAboutOpen] = useState(false)
     const [copiedField, setCopiedField] = useState<'email' | 'phone' | null>(null)
 
     useEffect(() => {
@@ -197,14 +201,14 @@ export default function ProfilePage() {
     }
 
     if (!isInitialized || !user) {
-        return <div className="min-h-screen bg-[#fcf9f8]" />
+        return <div className="min-h-screen bg-white" />
     }
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#fcf9f8] text-[#1c1b1b]")}>
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-white text-[#1c1b1b]")}>
             <div className="max-w-[428px] mx-auto min-h-screen flex flex-col relative">
                 {/* Top App Bar */}
-                <header className="sticky top-0 z-30 bg-[#fcf9f8] border-b-[3px] border-[#1c1b1b] shadow-[0px_3px_0px_#111111]">
+                <header className="sticky top-0 z-30 bg-white border-b-[3px] border-[#1c1b1b] shadow-[0px_3px_0px_#111111]">
                     <div className="flex items-center gap-3 w-full px-4 py-3">
                         <button
                             aria-label="Go back"
@@ -285,6 +289,13 @@ export default function ProfilePage() {
                                 label="Contact & Support"
                                 description="Reach our support team"
                                 onClick={() => setIsContactOpen(true)}
+                            />
+                            <SettingsRow
+                                icon={<Info size={19} />}
+                                iconBg="#ebe7e7"
+                                iconColor="#1c1b1b"
+                                label="About"
+                                onClick={() => setIsAboutOpen(true)}
                             />
                             <SettingsRow
                                 icon={<LogOut size={19} />}
@@ -636,6 +647,62 @@ export default function ProfilePage() {
                             >
                                 <ShieldCheck size={18} />
                                 <span>I Understand &amp; Accept</span>
+                            </button>
+                        </div>
+                    </div>
+                </ModalBackdrop>
+            )}
+
+            {/* About Modal */}
+            {isAboutOpen && (
+                <ModalBackdrop onClose={() => setIsAboutOpen(false)} maxWidth="380px" contentClassName="max-h-[85vh] flex flex-col">
+                    <ModalCloseButton onClick={() => setIsAboutOpen(false)} />
+                    <div className="text-left flex flex-col min-h-0 space-y-4">
+                        <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-[#ffdf99] border-[3px] border-[#1c1b1b] flex items-center justify-center shadow-[3px_3px_0px_#111111]">
+                                <Info size={24} className="text-[#251a00]" />
+                            </div>
+                            <div>
+                                <h4 className="text-xl leading-tight tracking-[-0.015em] font-extrabold text-[#1c1b1b]">About loyalpe</h4>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#ffdad2] text-[#b52603] text-[11px] font-extrabold border-[1.5px] border-[#1c1b1b]">
+                                        v2.4.0 (Build 89)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="overflow-y-auto pr-1 space-y-3 flex-1">
+                            <div className="p-3 rounded-xl bg-[#dde1ff] border-2 border-[#1c1b1b] shadow-[2px_2px_0px_#111111]">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[17px] leading-[22px] tracking-[-0.01em] font-extrabold text-[#0040e0]">loyalpe+</span>
+                                    <span className="text-[11px] bg-white px-2 py-0.5 rounded-full border border-[#1c1b1b] font-extrabold">
+                                        Rewards &bull; Perks &bull; You
+                                    </span>
+                                </div>
+                                <p className="text-xs font-semibold leading-relaxed text-[#434656]">
+                                    Connecting neighborhood cafes, stores, and customers with seamless UPI payments and local rewards.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="p-2.5 rounded-lg bg-[#f6f3f2] border-2 border-[#1c1b1b] flex items-start gap-2.5 shadow-[2px_2px_0px_#111111]">
+                                    <MapPin size={20} className="text-[#0040e0] shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold text-[#1c1b1b]">Registered Office</p>
+                                        <p className="text-xs leading-4 font-semibold text-[#434656]">thodupuzha , idukki , keralam</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsAboutOpen(false)}
+                                className="w-full bg-[#0040e0] hover:bg-[#2e5bff] text-white text-[13px] leading-4 font-extrabold py-2.5 rounded-lg border-2 border-[#1c1b1b] shadow-[3px_3px_0px_#111111] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                Got It
                             </button>
                         </div>
                     </div>

@@ -27,6 +27,9 @@ export type RestaurantOwnerDocument = {
     // as a cache-busting version in the image URL. The picture itself is a
     // file on disk — see lib/restaurantImageStorage.ts.
     profileImageVersion?: number
+    // Same idea for the wide banner shown at the top of the shop's details
+    // page — set when a banner has been uploaded.
+    bannerImageVersion?: number
     // What kind of business this is (e.g. "Cafe", "Bakery") — free text set
     // by the owner in the admin Profile tab, shown under the name on the
     // customer-facing shops page.

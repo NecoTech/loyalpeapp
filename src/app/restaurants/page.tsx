@@ -152,7 +152,7 @@ export default function RestaurantsPage() {
         && !cityOptions.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
     return (
-        <div className={cn(plusJakartaSans.className, "min-h-screen bg-[#FBF7EE] text-[#121212] flex justify-center selection:bg-[#FFBE18] selection:text-black")}>
+        <div className={cn(plusJakartaSans.className, "min-h-screen bg-white text-[#121212] flex justify-center selection:bg-[#FFBE18] selection:text-black")}>
             <div className="w-full max-w-md min-h-screen pb-28 flex flex-col relative px-4 pt-3">
                 {/* Top Bar */}
                 <header className="flex items-center justify-between py-2 mb-3">
@@ -280,7 +280,7 @@ export default function RestaurantsPage() {
                     <div className="absolute inset-0 cursor-pointer" onClick={closeCityModal} />
                     <div
                         className={cn(
-                            "relative w-full max-w-md mx-auto bg-[#FBF7EE] border-t-4 border-x-2 border-[#121212] rounded-t-[28px] shadow-2xl px-5 pt-4 pb-8 transform transition-transform duration-200 max-h-[85vh] flex flex-col z-10",
+                            "relative w-full max-w-md mx-auto bg-white border-t-4 border-x-2 border-[#121212] rounded-t-[28px] shadow-2xl px-5 pt-4 pb-8 transform transition-transform duration-200 max-h-[85vh] flex flex-col z-10",
                             isCitySheetVisible ? "translate-y-0" : "translate-y-full"
                         )}
                     >

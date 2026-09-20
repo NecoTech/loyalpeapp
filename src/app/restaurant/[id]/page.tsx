@@ -113,7 +113,7 @@ function RestaurantContent() {
         return (
             <div className={cn(
                 "min-h-screen flex flex-col items-center justify-center p-4",
-                "bg-gray-50 dark:bg-zinc-900"
+                "bg-white dark:bg-zinc-900"
             )}>
                 <div className="w-full max-w-md">
                     <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8">
@@ -230,7 +230,7 @@ function RestaurantContent() {
         return (
             <div className={cn(
                 "min-h-screen flex items-center justify-center",
-                "bg-gray-50 dark:bg-zinc-900"
+                "bg-white dark:bg-zinc-900"
             )}>
                 <div className="text-center">
                     <p className="text-red-500 dark:text-red-400 text-lg mb-4">
@@ -255,7 +255,7 @@ function RestaurantContent() {
         return (
             <div className={cn(
                 "min-h-screen flex items-center justify-center",
-                "bg-gray-50 dark:bg-zinc-900"
+                "bg-white dark:bg-zinc-900"
             )}>
                 <div className="text-center">
                     <p className="text-red-500 dark:text-red-400 text-lg mb-4">

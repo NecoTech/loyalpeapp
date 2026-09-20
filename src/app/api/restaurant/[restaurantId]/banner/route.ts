@@ -2,5 +2,5 @@ import { restaurantImageResponse } from '../../../../../../lib/restaurantImageRe
 
 export async function GET(_request: Request, { params }: { params: Promise<{ restaurantId: string }> }) {
     const { restaurantId } = await params
-    return restaurantImageResponse(restaurantId, 'profile')
+    return restaurantImageResponse(restaurantId, 'banner')
 }

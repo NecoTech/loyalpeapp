@@ -1,13 +1,14 @@
 'use client'
 
-const OUTPUT_SIZE = 512
 const MAX_INPUT_BYTES = 15 * 1024 * 1024
 
-// Center-crops the chosen picture to a square, scales it to 512x512 and
-// re-encodes it as JPEG — so what gets uploaded is always a small, standard
-// image regardless of what the owner picked (a 12MP phone photo becomes
-// roughly 50-100KB). Returns the bare base64 payload.
-export async function prepareRestaurantImage(file: File): Promise<string> {
+type OutputSpec = { width: number; height: number; quality: number }
+
+// Center-crops the chosen picture to the output's aspect ratio, scales it to
+// the exact output size and re-encodes it as JPEG — so what gets uploaded is
+// always a small, standard image regardless of what the owner picked (a 12MP
+// phone photo becomes roughly 50-200KB). Returns the bare base64 payload.
+async function prepareImage(file: File, { width, height, quality }: OutputSpec): Promise<string> {
     if (!file.type.startsWith('image/')) {
         throw new Error('Please choose an image file.')
     }
@@ -23,22 +24,27 @@ export async function prepareRestaurantImage(file: File): Promise<string> {
     }
 
     try {
-        const side = Math.min(bitmap.width, bitmap.height)
-        const sx = (bitmap.width - side) / 2
-        const sy = (bitmap.height - side) / 2
+        // Largest region of the picture, centered, with the output's shape.
+        const targetRatio = width / height
+        let sw = bitmap.width
+        let sh = bitmap.height
+        if (sw / sh > targetRatio) sw = sh * targetRatio
+        else sh = sw / targetRatio
+        const sx = (bitmap.width - sw) / 2
+        const sy = (bitmap.height - sh) / 2
 
         const canvas = document.createElement('canvas')
-        canvas.width = OUTPUT_SIZE
-        canvas.height = OUTPUT_SIZE
+        canvas.width = width
+        canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) throw new Error("Couldn't process that image.")
 
         // JPEG has no transparency — put transparent PNGs on white, not black.
         ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE)
-        ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE)
+        ctx.fillRect(0, 0, width, height)
+        ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, width, height)
 
-        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
         if (!blob) throw new Error("Couldn't process that image.")
 
         const bytes = new Uint8Array(await blob.arrayBuffer())
@@ -51,4 +57,14 @@ export async function prepareRestaurantImage(file: File): Promise<string> {
     } finally {
         bitmap.close()
     }
+}
+
+// Square profile photo.
+export function prepareRestaurantImage(file: File) {
+    return prepareImage(file, { width: 512, height: 512, quality: 0.85 })
+}
+
+// Wide 2:1 banner — roughly the shape of the hero area on the details page.
+export function prepareRestaurantBanner(file: File) {
+    return prepareImage(file, { width: 1200, height: 600, quality: 0.82 })
 }

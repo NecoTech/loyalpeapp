@@ -17,7 +17,6 @@ import {
     Store,
     Gift,
     Bell,
-    ArrowLeft,
     UserRound,
 } from 'lucide-react'
 import { useAuth } from './context/AuthContext'
@@ -595,7 +594,7 @@ export default function Home() {
                     <div className="absolute inset-0 cursor-pointer" onClick={closeNotifModal} />
                     <div
                         className={cn(
-                            "relative w-full max-w-[428px] mx-auto bg-white border-t-4 border-x-2 border-[#111111] rounded-t-[28px] shadow-2xl px-5 pt-4 pb-8 transform transition-transform duration-200 max-h-[90vh] flex flex-col z-10",
+                            "relative w-full max-w-[428px] mx-auto bg-[#FAF7F0] border-t-4 border-x-2 border-[#111111] rounded-t-[28px] shadow-2xl px-5 pt-4 pb-8 transform transition-transform duration-200 max-h-[90vh] flex flex-col z-10",
                             isNotifVisible ? "translate-y-0" : "translate-y-full"
                         )}
                     >
@@ -616,14 +615,14 @@ export default function Home() {
                                 onClick={closeNotifModal}
                                 className="w-10 h-10 rounded-xl bg-white border-[2.5px] border-black shadow-[2px_2px_0px_#000000] flex items-center justify-center active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all hover:bg-zinc-50 text-[#111111] cursor-pointer"
                             >
-                                <ArrowLeft size={20} strokeWidth={2.5} />
+                                <X size={20} strokeWidth={2.75} />
                             </button>
                         </div>
 
                         <div className="overflow-y-auto no-scrollbar flex flex-col gap-4">
-                            <section className="w-full bg-[#14151F] border-[3px] border-black rounded-[24px] shadow-[4px_4px_0px_#000000] p-5 flex flex-col gap-3.5 relative overflow-hidden">
+                            <section className="w-full bg-[#14151F] border-[3px] border-[#111111] shadow-[4px_4px_0px_#111111] p-5 flex flex-col gap-3.5 relative overflow-hidden">
                                 <div className="flex items-center justify-between">
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#D4F63D] text-[#111111] text-xs font-black uppercase rounded-full tracking-wider border-2 border-black shadow-[2px_2px_0px_#000000]">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#D4F63D] text-[#111111] text-[11px] font-black uppercase rounded-full tracking-wider border-2 border-black shadow-[2px_2px_0px_#000000]">
                                         🏪 Merchants
                                     </span>
                                 </div>
@@ -637,7 +636,7 @@ export default function Home() {
                                     </p>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-0.5">
+                                <div className="flex items-center gap-2">
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 border-[1.5px] border-white/20 rounded-full text-[11px] font-bold text-white shadow-sm">
                                         ♾️ Unlimited Invites
                                     </span>

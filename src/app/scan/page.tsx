@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Inter } from 'next/font/google'
-import { ArrowLeft, Zap } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import jsQR from 'jsqr'
 import { cn } from '../../../lib/utils'
 import { extractUpiVpa } from '../../../lib/upi'
@@ -33,8 +33,10 @@ export default function ScanPage() {
     const [status, setStatus] = useState<Status>('requesting')
     const [errorMessage, setErrorMessage] = useState('')
     const [isFlashOn, setIsFlashOn] = useState(false)
-    const [flashNotice, setFlashNotice] = useState('')
-    const flashNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    // A short message shown in the guidance slot above the flash button —
+    // for things the tap-only controls can't say on their own.
+    const [notice, setNotice] = useState('')
+    const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const stopCamera = useCallback(() => {
         if (frameRef.current !== null) {
@@ -47,10 +49,10 @@ export default function ScanPage() {
         setIsFlashOn(false)
     }, [])
 
-    const showFlashNotice = useCallback((message: string) => {
-        setFlashNotice(message)
-        if (flashNoticeTimerRef.current) clearTimeout(flashNoticeTimerRef.current)
-        flashNoticeTimerRef.current = setTimeout(() => setFlashNotice(''), 2500)
+    const showNotice = useCallback((message: string, durationMs = 2500) => {
+        setNotice(message)
+        if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current)
+        noticeTimerRef.current = setTimeout(() => setNotice(''), durationMs)
     }, [])
 
     // The flashlight is the camera's "torch" constraint. Many devices (most
@@ -59,7 +61,7 @@ export default function ScanPage() {
         const track = streamRef.current?.getVideoTracks()[0]
         const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
         if (!track || !capabilities?.torch) {
-            showFlashNotice("Flash isn't available on this device.")
+            showNotice("Flash isn't available on this device.")
             return
         }
 
@@ -69,9 +71,9 @@ export default function ScanPage() {
             setIsFlashOn(next)
         } catch (err) {
             console.error('Failed to toggle flash', err)
-            showFlashNotice("Couldn't turn the flash on.")
+            showNotice("Couldn't turn the flash on.")
         }
-    }, [isFlashOn, showFlashNotice])
+    }, [isFlashOn, showNotice])
 
     const handleDecoded = useCallback(async (text: string) => {
         if (hasResolvedRef.current) return
@@ -179,83 +181,125 @@ export default function ScanPage() {
         return () => {
             cancelled = true
             stopCamera()
-            if (flashNoticeTimerRef.current) clearTimeout(flashNoticeTimerRef.current)
+            if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    // Nothing is shown while scanning normally — the camera view is the
+    // whole interface — only progress, problems and short hints.
+    const guidance = notice
+        || (status === 'requesting' ? 'Requesting camera access...' : '')
+        || (status === 'resolving' ? 'Matching restaurant...' : '')
+        || (status === 'error' ? errorMessage : '')
+
+    // The chips are UPI apps a payment can be made with. Nothing is paid from
+    // this screen — a restaurant's QR code is scanned first, and the app is
+    // chosen on that restaurant's payment page — so tapping one says so.
+    const upiApps = [
+        { name: 'GPay', label: 'Pay with Google Pay' },
+        { name: 'PhonePe', label: 'Pay with PhonePe' },
+        { name: 'Paytm', label: 'Pay with Paytm' },
+    ]
+
     return (
-        <div className={cn(inter.className, "bg-black text-white antialiased select-none h-[100dvh] w-full overflow-hidden flex flex-col justify-between items-center relative")}>
-            {/* Camera feed */}
-            <video
-                ref={videoRef}
-                className="absolute inset-0 w-full h-full object-cover z-0"
-                muted
-                playsInline
-            />
-            <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(circle_at_60%_40%,transparent_0%,rgba(0,0,0,0.4)_60%,rgba(0,0,0,0.85)_100%)]" />
-            <canvas ref={canvasRef} className="hidden" />
-
-            {/* Top Navigation */}
-            <header className="relative z-20 w-full pt-12 pb-4 px-6 flex items-center justify-center max-w-md mx-auto">
+        <div className={cn(inter.className, "antialiased overflow-hidden flex justify-center items-center min-h-screen bg-white text-white")}>
+            <div className="relative w-full max-w-[420px] h-[100dvh] max-h-[900px] overflow-hidden bg-white flex flex-col justify-between select-none rounded-[44px]">
                 <button
-                    onClick={() => { stopCamera(); router.back() }}
-                    aria-label="Go back"
                     type="button"
-                    className="absolute left-6 w-11 h-11 rounded-xl bg-white border-[2.5px] border-black flex items-center justify-center text-black shadow-[3px_3px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
+                    aria-label="Go back"
+                    onClick={() => { stopCamera(); router.back() }}
+                    className="absolute left-6 z-30 flex items-center justify-center w-11 h-11 bg-white border-2 border-[#111111] rounded-xl shadow-[3px_3px_0px_#111111] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer top-12"
                 >
-                    <ArrowLeft size={22} strokeWidth={2.5} />
+                    <ArrowLeft className="w-6 h-6 text-[#111111]" strokeWidth={2.5} />
                 </button>
-                <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-md">
-                    Scan QR
-                </h1>
-            </header>
+                <div className="absolute top-0 left-0 right-0 w-full bg-white z-10 pointer-events-none h-6" />
 
-            {/* Scanner Viewfinder */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-6">
-                <div className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-3xl border-[3.5px] border-[#B4F82C] shadow-[0_0_16px_rgba(180,248,44,0.45),inset_0_0_12px_rgba(180,248,44,0.25)] overflow-hidden bg-black/10 backdrop-contrast-125">
-                    <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-white/60" />
-                    <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-white/60" />
-                    <div className="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-white/60" />
-                    <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-white/60" />
+                {/* Camera feed */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-neutral-100">
+                    <video
+                        ref={videoRef}
+                        className="w-full h-full object-cover object-center filter brightness-90 scale-105"
+                        muted
+                        playsInline
+                    />
+                    {/* Fades the feed into white for the controls at the bottom */}
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0)_0%,rgba(255,255,255,0)_55%,rgba(255,255,255,0.8)_75%,rgb(255,255,255)_90%,rgb(255,255,255)_100%)]" />
                 </div>
-                <p className="mt-6 text-sm font-medium text-zinc-300 tracking-wide text-center drop-shadow">
-                    {flashNotice}
-                    {!flashNotice && status === 'requesting' && 'Requesting camera access...'}
-                    {!flashNotice && status === 'scanning' && 'Align QR code within frame'}
-                    {!flashNotice && status === 'resolving' && 'Matching restaurant...'}
-                    {!flashNotice && status === 'error' && errorMessage}
-                </p>
-            </main>
+                <canvas ref={canvasRef} className="hidden" />
 
-            {/* Bottom Controls */}
-            <footer className="relative z-20 w-full pb-8 pt-2 px-6 flex flex-col items-center max-w-md mx-auto">
-                <div className="flex items-center justify-center gap-6 mb-5">
-                    <button
-                        type="button"
-                        onClick={toggleFlash}
-                        aria-label="Toggle flashlight"
-                        aria-pressed={isFlashOn}
-                        className={cn(
-                            "px-5 h-12 rounded-2xl bg-zinc-900 border-2 flex items-center justify-center gap-2.5 text-white shadow-[3px_3px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none hover:border-[#B4F82C] transition-all cursor-pointer select-none",
-                            isFlashOn ? "border-[#B4F82C]" : "border-white/80"
+                <main className="relative z-10 flex flex-col items-center justify-center px-6 flex-grow my-auto">
+                    {/* Guidance */}
+                    <div className="mt-6 text-center max-w-[240px]" aria-live="polite">
+                        {guidance && (
+                            <p className="inline-block px-3 py-2 rounded-xl bg-white border-2 border-[#111111] shadow-[3px_3px_0px_#111111] text-xs font-bold text-[#111111] leading-snug">
+                                {guidance}
+                            </p>
                         )}
-                    >
-                        <Zap size={22} strokeWidth={2.5} fill="currentColor" className="text-[#B4F82C]" />
-                        <span className="text-xs font-bold tracking-wider uppercase text-white">Flash</span>
-                    </button>
-                </div>
+                    </div>
 
-                <div className="mt-4 flex items-center justify-center gap-3 opacity-60 text-[10px] tracking-wider uppercase font-semibold text-zinc-400">
-                    <span>GPay</span>
-                    <span>•</span>
-                    <span>PhonePe</span>
-                    <span>•</span>
-                    <span>Paytm</span>
-                    <span>•</span>
-                    <span>BHIM UPI</span>
-                </div>
-            </footer>
+                    {/* Flash */}
+                    <div className="flex flex-col items-center gap-1.5 mt-auto" style={{ marginBottom: 24 }}>
+                        <button
+                            type="button"
+                            onClick={toggleFlash}
+                            aria-label="Toggle Flashlight"
+                            aria-pressed={isFlashOn}
+                            className={cn(
+                                "flex items-center justify-center w-12 h-12 rounded-full backdrop-blur-md shadow-md border active:scale-95 transition-all",
+                                isFlashOn
+                                    ? "bg-[#fbbf24] text-[#78350f] border-[#f59e0b] scale-[1.08] shadow-[0_0_25px_rgba(251,191,36,0.9),0_0_10px_rgba(245,158,11,0.6)]"
+                                    : "bg-white/70 border-black/10 text-neutral-800 hover:bg-white"
+                            )}
+                        >
+                            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
+                        </button>
+                        <span className="text-[11px] font-medium text-neutral-600 tracking-wide">Flash</span>
+                    </div>
+
+                    {/* UPI apps */}
+                    <div className="flex flex-col items-center gap-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                        <div className="flex items-center gap-2">
+                            <span className="w-6 h-[1px] bg-neutral-300" />
+                            <span className="text-[11px] text-neutral-500 font-medium tracking-wide uppercase">&nbsp;pay with UPI apps&nbsp;</span>
+                            <span className="w-6 h-[1px] bg-neutral-300" />
+                        </div>
+                        <div className="flex items-center justify-center gap-3.5">
+                            {upiApps.map(app => (
+                                <button
+                                    key={app.name}
+                                    type="button"
+                                    aria-label={app.label}
+                                    onClick={() => showNotice(`Scan the restaurant's QR code, then choose ${app.name} to pay.`, 4000)}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 hover:bg-white backdrop-blur-md shadow-sm border border-black/10 active:scale-95 transition-all group"
+                                >
+                                    {app.name === 'GPay' && (
+                                        <div className="w-6 h-6 rounded-full bg-white shadow-xs flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                    {app.name === 'PhonePe' && (
+                                        <div className="w-6 h-6 rounded-full bg-[#5f259f] shadow-xs flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white font-bold text-[13px] leading-none select-none">पे</span>
+                                        </div>
+                                    )}
+                                    {app.name === 'Paytm' && (
+                                        <div className="h-6 px-1.5 rounded-md bg-[#002970]/5 flex items-center justify-center flex-shrink-0 border border-[#002970]/10">
+                                            <span className="font-black text-[10px] tracking-tight text-[#002970] leading-none">Pay<span className="text-[#00baf2]">tm</span></span>
+                                        </div>
+                                    )}
+                                    <span className="text-xs font-semibold text-neutral-800 tracking-tight">{app.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </main>
+            </div>
         </div>
     )
 }

@@ -93,18 +93,126 @@ export function clearPendingUpiPayment(referenceId?: string) {
     }
 }
 
+export type RecordedTransaction = {
+    amount: number
+    discountAmount: number
+    finalAmount: number
+    freeItemName?: string
+    discountType?: 'percentage' | 'flat'
+    discountValue?: number
+}
+
+// A payment that was confirmed with the gateway and recorded, but whose
+// success screen the customer hasn't dismissed yet. Persisted (not just held
+// in React state) so the success screen still appears if the app is closed or
+// killed between the payment being recorded and the customer seeing it — the
+// pending record above is gone by then, so without this the confirmation
+// would be lost and the customer would never know the payment went through.
+const UNSEEN_PAYMENT_SUCCESS_KEY = 'loyalpe_unseen_payment_success'
+const UNSEEN_PAYMENT_SUCCESS_TTL_MS = 24 * 60 * 60 * 1000
+
+export type UnseenPaymentSuccess = {
+    referenceId: string
+    restaurantId: string
+    userId: string
+    cardId?: string
+    itemId?: string
+    completedAt: number
+    transaction: RecordedTransaction
+}
+
+export function readUnseenPaymentSuccess(): UnseenPaymentSuccess | null {
+    try {
+        const raw = localStorage.getItem(UNSEEN_PAYMENT_SUCCESS_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as UnseenPaymentSuccess
+        if (!parsed?.referenceId || !parsed?.restaurantId || !parsed?.userId || !parsed?.completedAt || !parsed?.transaction) {
+            return null
+        }
+        if (Date.now() - parsed.completedAt > UNSEEN_PAYMENT_SUCCESS_TTL_MS) {
+            localStorage.removeItem(UNSEEN_PAYMENT_SUCCESS_KEY)
+            return null
+        }
+        return parsed
+    } catch {
+        return null
+    }
+}
+
+function writeUnseenPaymentSuccess(payment: UnseenPaymentSuccess) {
+    try {
+        localStorage.setItem(UNSEEN_PAYMENT_SUCCESS_KEY, JSON.stringify(payment))
+    } catch {
+        // localStorage unavailable — the success screen still shows this
+        // session via the recorded event below; it just can't survive a kill.
+    }
+}
+
+export function clearUnseenPaymentSuccess(referenceId?: string) {
+    try {
+        if (referenceId) {
+            const existing = readUnseenPaymentSuccess()
+            if (existing && existing.referenceId !== referenceId) return
+        }
+        localStorage.removeItem(UNSEEN_PAYMENT_SUCCESS_KEY)
+    } catch {
+        // ignore
+    }
+}
+
+// Fired on `window` once a payment has been recorded / has definitively
+// failed, by whichever code path finished verifying it. The app-wide success
+// screen (PaymentRecovery) and the payment page both listen for these rather
+// than depending on who happened to run the check — the check can be started
+// from the payment page, the Transactions page, or the app-wide watcher, and
+// only one of them gets the real result (the rest see it already resolved).
+export const PAYMENT_RECORDED_EVENT = 'loyalpe:payment-recorded'
+export const PAYMENT_FAILED_EVENT = 'loyalpe:payment-failed'
+
+export type PaymentRecordedDetail = { restaurantId: string; referenceId: string; payment: UnseenPaymentSuccess }
+export type PaymentFailedDetail = { restaurantId: string; referenceId: string; message: string }
+
+function emit<T>(name: string, detail: T) {
+    try {
+        window.dispatchEvent(new CustomEvent<T>(name, { detail }))
+    } catch {
+        // ignore
+    }
+}
+
 export type PendingUpiPaymentOutcome =
-    | { outcome: 'success'; transaction: { amount: number; discountAmount: number; finalAmount: number; freeItemName?: string; discountType?: 'percentage' | 'flat'; discountValue?: number }; pending: PendingUpiPayment }
+    | { outcome: 'success'; transaction: RecordedTransaction; pending: PendingUpiPayment }
     | { outcome: 'failed'; message: string; pending: PendingUpiPayment }
     | { outcome: 'pending' }
     | { outcome: 'none' }
 
+// Only one verification per payment runs at a time. The payment page, the
+// Transactions page and the app-wide watcher can all ask at once (e.g. the
+// app is reopened and several things react to it) — sharing the in-flight
+// check means they all get the same answer instead of racing to record the
+// same payment.
+let inFlight: { referenceId: string; promise: Promise<PendingUpiPaymentOutcome> } | null = null
+
 // Checks Omniware for a pending payment's real status and, if it actually
 // succeeded, records the transaction — a safety net for a payment that was
 // completed in the UPI app but never got confirmed here (tab/PWA closed
-// before the user returned to the restaurant's payment page). Always
-// finalizes under the pending record's own userId (who actually made the
-// payment), not whoever happens to be logged in when this check runs.
+// before the user returned). Always finalizes under the pending record's own
+// userId (who actually made the payment), not whoever happens to be logged
+// in when this check runs. `pendingOverride` lets the payment page pass the
+// payment it just started when localStorage couldn't hold it.
+export function verifyPendingUpiPayment(pendingOverride?: PendingUpiPayment): Promise<PendingUpiPaymentOutcome> {
+    const pending = pendingOverride ?? readPendingUpiPayment()
+    if (!pending) return Promise.resolve({ outcome: 'none' })
+
+    if (inFlight?.referenceId === pending.referenceId) return inFlight.promise
+
+    const promise = runVerification(pending).finally(() => {
+        if (inFlight?.promise === promise) inFlight = null
+    })
+    inFlight = { referenceId: pending.referenceId, promise }
+    return promise
+}
+
 // The status check uses plain fetch, matching the payment page, since that
 // route follows the Omniware gateway's own contract and is intentionally
 // excluded from the app's request/response encryption. The redeem call
@@ -112,10 +220,7 @@ export type PendingUpiPaymentOutcome =
 // /api/loyalty/redeem only accepts an encrypted body and returns an
 // encrypted response; calling it with plain fetch fails to decrypt server
 // side and the payment never actually gets saved.
-export async function verifyPendingUpiPayment(): Promise<PendingUpiPaymentOutcome> {
-    const pending = readPendingUpiPayment()
-    if (!pending) return { outcome: 'none' }
-
+async function runVerification(pending: PendingUpiPayment): Promise<PendingUpiPaymentOutcome> {
     try {
         const statusRes = await fetch('/api/omniware/check-payment-status', {
             method: 'POST',
@@ -125,7 +230,7 @@ export async function verifyPendingUpiPayment(): Promise<PendingUpiPaymentOutcom
         const statusResult = await statusRes.json()
 
         if (statusResult.success && statusResult.txnStatus === 'SUCCESS') {
-            const { data: redeemData } = await secureFetch('/api/loyalty/redeem', {
+            const { res: redeemRes, data: redeemData } = await secureFetch('/api/loyalty/redeem', {
                 method: 'POST',
                 body: {
                     userId: pending.userId,
@@ -136,23 +241,48 @@ export async function verifyPendingUpiPayment(): Promise<PendingUpiPaymentOutcom
                     orderId: pending.referenceId,
                 },
             })
-            clearPendingUpiPayment(pending.referenceId)
 
-            if (!redeemData?.success) {
-                return { outcome: 'failed', message: redeemData?.error || 'Could not record the payment.', pending }
+            if (redeemData?.success) {
+                const payment: UnseenPaymentSuccess = {
+                    referenceId: pending.referenceId,
+                    restaurantId: pending.restaurantId,
+                    userId: pending.userId,
+                    cardId: pending.cardId,
+                    itemId: pending.itemId,
+                    completedAt: Date.now(),
+                    transaction: redeemData.transaction,
+                }
+                // Written before the pending record is cleared: if the app
+                // dies between the two, the payment is still remembered.
+                writeUnseenPaymentSuccess(payment)
+                clearPendingUpiPayment(pending.referenceId)
+                emit<PaymentRecordedDetail>(PAYMENT_RECORDED_EVENT, { restaurantId: pending.restaurantId, referenceId: pending.referenceId, payment })
+                return { outcome: 'success', transaction: redeemData.transaction, pending }
             }
-            return { outcome: 'success', transaction: redeemData.transaction, pending }
+
+            // The gateway confirmed the money but our server couldn't record
+            // it (it's down, or the request didn't get through). Keep the
+            // pending record and report "still pending" so a later check
+            // retries — recording is idempotent per orderId, so retrying is
+            // safe. Only a definite rejection (a 4xx) is given up on.
+            if (!redeemRes.ok && redeemRes.status >= 500) {
+                console.error('Could not record a confirmed payment yet; will retry', redeemData?.error)
+                return { outcome: 'pending' }
+            }
+
+            clearPendingUpiPayment(pending.referenceId)
+            const message = `${redeemData?.error || 'Could not record the payment.'} If money was deducted, please contact support.`
+            emit<PaymentFailedDetail>(PAYMENT_FAILED_EVENT, { restaurantId: pending.restaurantId, referenceId: pending.referenceId, message })
+            return { outcome: 'failed', message, pending }
         }
 
         if (statusResult.success && (statusResult.txnStatus === 'FAILED' || statusResult.txnStatus === 'CANCELLED')) {
             clearPendingUpiPayment(pending.referenceId)
-            return {
-                outcome: 'failed',
-                message: statusResult.txnStatus === 'CANCELLED'
-                    ? 'Payment was cancelled. No amount has been deducted.'
-                    : 'Payment was not completed.',
-                pending,
-            }
+            const message = statusResult.txnStatus === 'CANCELLED'
+                ? 'Payment was cancelled. No amount has been deducted.'
+                : 'Payment was not completed.'
+            emit<PaymentFailedDetail>(PAYMENT_FAILED_EVENT, { restaurantId: pending.restaurantId, referenceId: pending.referenceId, message })
+            return { outcome: 'failed', message, pending }
         }
 
         return { outcome: 'pending' }

@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes"
 import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext'
 import { LocationProvider } from './context/LocationContext'
+import PaymentRecovery from './components/PaymentRecovery'
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -70,6 +71,7 @@ export default function RootLayout({
             <LocationProvider>
               <CartProvider>
                 {children}
+                <PaymentRecovery />
               </CartProvider>
             </LocationProvider>
           </AuthProvider>

@@ -3,12 +3,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { ArrowLeft, Home, X, CreditCard, Store, Delete, Check, ChevronDown, Gift, QrCode, AlertTriangle, Loader2, BadgeCheck, Star, Sparkles, Cake } from 'lucide-react'
+import { ArrowLeft, Home, X, CreditCard, Store, Delete, Check, ChevronDown, Gift, QrCode, AlertTriangle, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
-import { readPendingUpiPayment, writePendingUpiPayment, clearPendingUpiPayment } from '../../../lib/pendingUpiPayment'
+import {
+    PAYMENT_FAILED_EVENT,
+    PAYMENT_RECORDED_EVENT,
+    verifyPendingUpiPayment,
+    writePendingUpiPayment,
+    clearPendingUpiPayment,
+    type PaymentFailedDetail,
+    type PaymentRecordedDetail,
+    type PendingUpiPayment,
+} from '../../../lib/pendingUpiPayment'
 import { useAuth } from '../context/AuthContext'
 import RestaurantPhoto from './RestaurantPhoto'
+import { CARD_THEMES, discountLabel, formatCurrency, ordinal, rewardLabel, type LoyaltyCard, type LoyaltyRewardItem } from './PaymentSuccessScreen'
 import Image from "next/image"
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
@@ -19,67 +29,7 @@ type RestaurantDetails = {
     imageUrl?: string | null
 }
 
-type LoyaltyRewardItem = {
-    id: string
-    stampsRequired: number
-    rewardType: 'discount' | 'freeItem'
-    discountType?: 'percentage' | 'flat'
-    discountValue?: number
-    freeItemName?: string
-}
-
-type LoyaltyCard = {
-    id: string
-    name: string
-    items: (LoyaltyRewardItem & { redeemed: boolean })[]
-}
-
-type PaymentResult = {
-    amount: number
-    discountAmount: number
-    finalAmount: number
-    freeItemName?: string
-    discountLabel?: string
-}
-
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0']
-
-function formatCurrency(value: number) {
-    return `₹${value.toFixed(2)}`
-}
-
-function discountLabel(item: LoyaltyRewardItem) {
-    if (item.rewardType !== 'discount') return ''
-    return item.discountType === 'flat'
-        ? `${formatCurrency(item.discountValue || 0)} off`
-        : `${item.discountValue || 0}% off`
-}
-
-function rewardLabel(item: LoyaltyRewardItem) {
-    if (item.rewardType === 'discount') return discountLabel(item)
-    return item.freeItemName || 'Free item'
-}
-
-function getInitials(name: string) {
-    return name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map(part => part[0]?.toUpperCase())
-        .join('') || '?'
-}
-
-function formatResultDate(date: Date) {
-    const today = new Date()
-    const isToday = date.getFullYear() === today.getFullYear()
-        && date.getMonth() === today.getMonth()
-        && date.getDate() === today.getDate()
-    return isToday ? 'Today' : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-}
-
-function formatResultTime(date: Date) {
-    return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
-}
 
 function isCardCompleted(card: LoyaltyCard) {
     return card.items.length > 0 && card.items.every(item => item.redeemed)
@@ -92,25 +42,6 @@ function orderCardsForDisplay(cards: LoyaltyCard[]) {
     return [...cards].sort((a, b) => Number(isCardCompleted(a)) - Number(isCardCompleted(b)))
 }
 
-function ordinal(n: number) {
-    const v = n % 100
-    if (v >= 11 && v <= 13) return 'th'
-    switch (n % 10) {
-        case 1: return 'st'
-        case 2: return 'nd'
-        case 3: return 'rd'
-        default: return 'th'
-    }
-}
-
-const CARD_THEMES = [
-    { bg: '#2e5bff', text: 'text-white', mutedText: 'text-white/70', badge: 'bg-white/20 border-white/30 text-white', checkedText: '#2e5bff' },
-    { bg: '#D8B4FE', text: 'text-zinc-900', mutedText: 'text-zinc-900/60', badge: 'bg-black/10 border-black/20 text-zinc-900', checkedText: '#7c3aed' },
-    { bg: '#FFDF40', text: 'text-zinc-900', mutedText: 'text-zinc-900/60', badge: 'bg-black/10 border-black/20 text-zinc-900', checkedText: '#a16207' },
-    { bg: '#D2F843', text: 'text-zinc-900', mutedText: 'text-zinc-900/60', badge: 'bg-black/10 border-black/20 text-zinc-900', checkedText: '#4d7c0f' },
-    { bg: '#FB7185', text: 'text-white', mutedText: 'text-white/70', badge: 'bg-white/20 border-white/30 text-white', checkedText: '#e11d48' },
-]
-
 export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }) {
     const router = useRouter()
     const { user, login } = useAuth()
@@ -118,12 +49,9 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     const [amount, setAmount] = useState('0')
     const [loyaltyCardId, setLoyaltyCardId] = useState<string | null>(null)
     const [activeItem, setActiveItem] = useState<LoyaltyRewardItem | null>(null)
-    const [isPaying, setIsPaying] = useState(false)
-    const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
-    const [successCardId, setSuccessCardId] = useState<string | null>(null)
-    const [successItemId, setSuccessItemId] = useState<string | null>(null)
-    const [successTimestamp, setSuccessTimestamp] = useState<Date | null>(null)
-    const [celebrationKey, setCelebrationKey] = useState(0)
+    // Bumped when a payment is recorded so the reward and card progress —
+    // which the payment just changed — are fetched again.
+    const [dataRefreshKey, setDataRefreshKey] = useState(0)
 
     // ── Loyalty cards drawer state ───────────────────────────────────────
     const [allCards, setAllCards] = useState<LoyaltyCard[]>([])
@@ -139,19 +67,16 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     const [upiQrCode, setUpiQrCode] = useState<string | null>(null)
     const [upiReferenceId, setUpiReferenceId] = useState<string | null>(null)
     const [isCheckingUpiPayment, setIsCheckingUpiPayment] = useState(false)
-    // Set only while re-checking a payment restored from localStorage on
-    // mount (see the pending-payment effect below) — distinct from
-    // isCheckingUpiPayment so the sheet's own "Checking..." button state
-    // isn't affected when the sheet was never reopened.
-    const [isVerifyingPendingPayment, setIsVerifyingPendingPayment] = useState(false)
+    // Only for problems starting the payment (the gateway rejecting the
+    // request); a payment that fails after the customer has left for their
+    // UPI app is reported app-wide by PaymentRecovery instead.
     const [paymentFailed, setPaymentFailed] = useState(false)
     const [paymentFailedMessage, setPaymentFailedMessage] = useState('')
-    const hasLeftAppRef = useRef(false)
-    const lastHiddenAtRef = useRef<number | null>(null)
-    // Guards against the visibilitychange listener, the focus listener, and
-    // a manual "I've Completed the Payment" tap all racing to check status
-    // (and finalize) the same payment at once — without this, two of them
-    // landing close together could both see SUCCESS and redeem it twice.
+    // The payment started from this page, kept in memory as well as in
+    // localStorage so it can still be checked if storage isn't available.
+    const startedPaymentRef = useRef<PendingUpiPayment | null>(null)
+    // Guards against a manual "I've Completed the Payment" tap and the
+    // app-wide watcher's own checks piling up on the same payment.
     const isCheckingStatusRef = useRef(false)
     const [showPhonePrompt, setShowPhonePrompt] = useState(false)
     const [phoneInput, setPhoneInput] = useState('')
@@ -212,7 +137,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             }
         }
         fetchActiveReward()
-    }, [restaurantId, user?.email, user?.phoneNumber])
+    }, [restaurantId, user?.email, user?.phoneNumber, dataRefreshKey])
 
     useEffect(() => {
         const userId = user?.email || user?.phoneNumber
@@ -234,16 +159,10 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             }
         }
         fetchCards()
-    }, [restaurantId, user?.email, user?.phoneNumber])
+    }, [restaurantId, user?.email, user?.phoneNumber, dataRefreshKey])
 
     const activeCard = allCards.find(c => c.id === loyaltyCardId) || null
     const orderedCards = orderCardsForDisplay(allCards)
-    const successCardIndex = allCards.findIndex(c => c.id === successCardId)
-    const successCard = successCardIndex >= 0 ? allCards[successCardIndex] : null
-    const successTheme = successCard ? CARD_THEMES[successCardIndex % CARD_THEMES.length] : null
-    const successUnlockedCount = successCard ? successCard.items.filter(i => i.redeemed).length : 0
-    const successTotalCount = successCard ? successCard.items.length : 0
-    const successNextReward = successCard ? successCard.items.find(i => !i.redeemed) : undefined
 
     const appendNumber = (num: string) => {
         setAmount(prev => {
@@ -272,76 +191,6 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         }
     }
     const finalAmount = Math.max(numericAmount - discountAmount, 0)
-
-    // Records the redemption/transaction in our own system once Omniware has
-    // actually confirmed the money was received.
-    // `override` supplies the userId/amount/card/item to redeem when the
-    // live component state can't be trusted — specifically the
-    // pending-payment restore path below, where the page just mounted
-    // fresh (tab/PWA was closed mid-payment) so `amount`/`activeItem`/
-    // `loyaltyCardId` are back at their defaults, and AuthContext may not
-    // have finished rehydrating `user` from localStorage yet either.
-    const finalizePayment = async (orderId?: string, override?: { userId: string; amount: number; cardId?: string; itemId?: string }) => {
-        const userId = override?.userId ?? (user?.email || user?.phoneNumber)
-        if (!userId) return
-
-        const redeemedItem = override ? null : activeItem
-        const redeemedCardId = override ? (override.cardId ?? null) : loyaltyCardId
-        const redeemedItemId = override ? override.itemId : redeemedItem?.id
-        const paymentAmount = override?.amount ?? numericAmount
-
-        setIsPaying(true)
-        try {
-            const { data } = await secureFetch('/api/loyalty/redeem', {
-                method: 'POST',
-                body: {
-                    userId,
-                    restaurantId,
-                    cardId: redeemedCardId || undefined,
-                    itemId: redeemedItemId,
-                    amount: paymentAmount,
-                    orderId,
-                },
-            })
-            if (!data?.success) {
-                console.error('Payment failed:', data.error)
-                return
-            }
-
-            setPaymentResult({
-                ...data.transaction,
-                discountLabel: redeemedItem?.rewardType === 'discount' ? discountLabel(redeemedItem) : undefined,
-            })
-            setSuccessTimestamp(new Date())
-            setCelebrationKey(k => k + 1)
-            setLoyaltyCardId(data.nextCard?.id ?? null)
-            setActiveItem(data.nextActiveItem)
-            setAmount('0')
-
-            // Refresh card progress so the success screen shows the card the
-            // payment just redeemed from with its up-to-date stamp state.
-            if (redeemedCardId) {
-                setSuccessCardId(redeemedCardId)
-                setSuccessItemId(redeemedItemId ?? null)
-                try {
-                    const searchParams = new URLSearchParams({ restaurantId, userId })
-                    const { res: cardsRes, data: cardsData } = await secureFetch(`/api/loyalty/card-progress?${searchParams.toString()}`)
-                    if (cardsRes.ok && cardsData?.success) {
-                        setAllCards((cardsData.cards as LoyaltyCard[]).filter(c => c.items.length > 0))
-                    }
-                } catch (err) {
-                    console.error('Failed to refresh loyalty cards after payment', err)
-                }
-            } else {
-                setSuccessCardId(null)
-                setSuccessItemId(null)
-            }
-        } catch (err) {
-            console.error('Failed to process payment', err)
-        } finally {
-            setIsPaying(false)
-        }
-    }
 
     // ── Omniware UPI intent helpers ─────────────────────────────────────
     const isIOSDevice = () => {
@@ -413,7 +262,6 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
 
     const launchUpiApp = (appKey?: string) => {
         if (!upiIntentUrl) return
-        hasLeftAppRef.current = true
 
         const openWithFallback = (target: { deepLink: string; storeUrl: string }) => {
             let didHide = false
@@ -447,38 +295,18 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         }
     }
 
-    // Checks payment status once, and finalizes the loyalty redemption on
-    // success. `override` is forwarded to finalizePayment — see its comment
-    // for why the pending-payment restore path needs it.
-    const checkUpiPaymentStatus = async (referenceId: string, override?: { userId: string; amount: number; cardId?: string; itemId?: string }) => {
+    // Asks the shared verifier whether the payment started here went through.
+    // Recording it (and the success / failure screens) happen app-wide —
+    // see PaymentRecovery and the listeners below — so this only reports
+    // whether the payment reached a final answer. Returns false while it's
+    // still pending or a check is already running.
+    const checkUpiPaymentStatus = async () => {
         if (isCheckingStatusRef.current) return false
         isCheckingStatusRef.current = true
         setIsCheckingUpiPayment(true)
         try {
-            const res = await fetch('/api/omniware/check-payment-status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orderId: referenceId, restaurantId }),
-            })
-            const result = await res.json()
-
-            if (result.success && result.txnStatus === 'SUCCESS') {
-                setShowUpiSheet(false)
-                clearPendingUpiPayment(referenceId)
-                await finalizePayment(referenceId, override)
-                return true
-            } else if (result.success && (result.txnStatus === 'FAILED' || result.txnStatus === 'CANCELLED')) {
-                setShowUpiSheet(false)
-                clearPendingUpiPayment(referenceId)
-                setPaymentFailed(true)
-                setPaymentFailedMessage(
-                    result.txnStatus === 'CANCELLED'
-                        ? 'Payment was cancelled. No amount has been deducted.'
-                        : 'Payment was not completed. Please try again.'
-                )
-                return true
-            }
-            return false
+            const result = await verifyPendingUpiPayment(startedPaymentRef.current ?? undefined)
+            return result.outcome === 'success' || result.outcome === 'failed'
         } catch (err) {
             console.error('Error checking UPI payment status:', err)
             return false
@@ -492,8 +320,8 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
         setShowUpiSheet(false)
         setUpiIntentUrl(null)
         setUpiQrCode(null)
-        hasLeftAppRef.current = false
         if (upiReferenceId) clearPendingUpiPayment(upiReferenceId)
+        startedPaymentRef.current = null
     }
 
     const startUpiIntent = async (phoneNumber: string) => {
@@ -531,7 +359,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
             setUpiQrCode(intentData.qr_code || null)
             setShowUpiSheet(true)
             const payerId = user?.email || user?.phoneNumber || phoneNumber
-            writePendingUpiPayment({
+            const startedPayment: PendingUpiPayment = {
                 referenceId,
                 restaurantId,
                 startedAt: Date.now(),
@@ -548,7 +376,9 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                 ...(activeItem?.rewardType === 'freeItem' ? {
                     freeItemName: activeItem.freeItemName,
                 } : {}),
-            })
+            }
+            startedPaymentRef.current = startedPayment
+            writePendingUpiPayment(startedPayment)
         } catch (err) {
             console.error('Error initiating UPI intent payment:', err)
             setPaymentFailed(true)
@@ -595,48 +425,34 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     }
     // ── end Omniware UPI intent helpers ─────────────────────────────────
 
-    // Detect returning to the tab after launching a UPI app and check status once.
+    // Coming back from the UPI app, or reopening a closed app, is handled
+    // app-wide by PaymentRecovery: it re-checks the pending payment, shows the
+    // success screen on whatever page the customer is on, and announces the
+    // outcome. This page only needs to tidy up its own state when that outcome
+    // is for this restaurant — and it hears about it whoever ran the check.
     useEffect(() => {
-        if (!showUpiSheet || !upiReferenceId) return
-
-        const handleVisibilityChange = async () => {
-            if (document.visibilityState === 'hidden') {
-                lastHiddenAtRef.current = Date.now()
-                return
-            }
-            if (document.visibilityState !== 'visible' || !hasLeftAppRef.current) return
-
-            const hiddenFor = lastHiddenAtRef.current ? Date.now() - lastHiddenAtRef.current : Infinity
-            if (hiddenFor < 700) return
-
-            const resolved = await checkUpiPaymentStatus(upiReferenceId)
-            if (resolved) hasLeftAppRef.current = false
+        const onRecorded = (event: Event) => {
+            const detail = (event as CustomEvent<PaymentRecordedDetail>).detail
+            if (detail?.restaurantId !== restaurantId) return
+            setShowUpiSheet(false)
+            setUpiIntentUrl(null)
+            setUpiQrCode(null)
+            startedPaymentRef.current = null
+            setAmount('0')
+            setDataRefreshKey(k => k + 1)
         }
-
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-        window.addEventListener('focus', handleVisibilityChange)
+        const onFailed = (event: Event) => {
+            const detail = (event as CustomEvent<PaymentFailedDetail>).detail
+            if (detail?.restaurantId !== restaurantId) return
+            setShowUpiSheet(false)
+            startedPaymentRef.current = null
+        }
+        window.addEventListener(PAYMENT_RECORDED_EVENT, onRecorded)
+        window.addEventListener(PAYMENT_FAILED_EVENT, onFailed)
         return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
-            window.removeEventListener('focus', handleVisibilityChange)
+            window.removeEventListener(PAYMENT_RECORDED_EVENT, onRecorded)
+            window.removeEventListener(PAYMENT_FAILED_EVENT, onFailed)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showUpiSheet, upiReferenceId])
-
-    // Covers the case where the browser tab (or an installed PWA) was fully
-    // closed or killed while the UPI app was in the foreground — no
-    // visibilitychange event ever fires on return, since this is a fresh
-    // mount. If a payment was left pending for this restaurant, check it
-    // once on load so a payment made in the UPI app still gets confirmed
-    // and shown here without the user having to re-enter the amount.
-    useEffect(() => {
-        if (!restaurantId) return
-        const pending = readPendingUpiPayment()
-        if (!pending || pending.restaurantId !== restaurantId) return
-
-        setIsVerifyingPendingPayment(true)
-        checkUpiPaymentStatus(pending.referenceId, { userId: pending.userId, amount: pending.amount, cardId: pending.cardId, itemId: pending.itemId })
-            .finally(() => setIsVerifyingPendingPayment(false))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [restaurantId])
 
     // ── Loyalty cards drawer helpers ─────────────────────────────────────
@@ -680,7 +496,7 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
     // ── end loyalty cards drawer helpers ─────────────────────────────────
 
     const isAmountValid = numericAmount > 0
-    const isSliding = isFetchingUpiIntent || isPaying
+    const isSliding = isFetchingUpiIntent
 
     return (
         <div className={cn(plusJakartaSans.className, "bg-white text-[#111111] min-h-screen flex flex-col justify-between antialiased relative overflow-x-hidden max-w-md mx-auto")}>
@@ -1011,26 +827,13 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                         </button>
 
                         <button
-                            onClick={() => upiReferenceId && checkUpiPaymentStatus(upiReferenceId)}
+                            onClick={() => checkUpiPaymentStatus()}
                             disabled={isCheckingUpiPayment}
                             className="w-full bg-[#D2F843] text-[#111111] font-bold py-3 rounded-2xl border-2 border-[#111111] keypad-shadow hover:opacity-90 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                         >
                             {isCheckingUpiPayment && <Loader2 size={18} className="animate-spin" />}
                             {isCheckingUpiPayment ? 'Checking...' : "I've Completed the Payment"}
                         </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Re-verifying a payment restored from a closed/killed tab */}
-            {isVerifyingPendingPayment && (
-                <div className="fixed inset-0 z-[100] bg-[#111111]/40 backdrop-blur-sm flex items-center justify-center p-6">
-                    <div className="bg-white w-full max-w-xs rounded-2xl border-2 border-[#111111] keypad-shadow-lg p-6 flex flex-col items-center gap-3 text-center">
-                        <Loader2 size={28} className="animate-spin text-[#111111]" />
-                        <div>
-                            <h3 className="text-lg font-extrabold text-[#111111]">Checking your payment</h3>
-                            <p className="text-sm text-zinc-500 mt-1">Confirming the payment you just made...</p>
-                        </div>
                     </div>
                 </div>
             )}
@@ -1091,221 +894,6 @@ export default function LoyaltyMockup({ restaurantId }: { restaurantId: string }
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Payment Success Celebration */}
-            {paymentResult && (
-                <div key={celebrationKey} className="fixed inset-0 z-[100] bg-white overflow-y-auto flex justify-center">
-                    <div className="w-full max-w-[428px] min-h-full flex flex-col relative pb-8">
-                        {/* Top Bar */}
-                        <header className="flex justify-between items-center w-full px-4 py-3 z-30 sticky top-0 bg-white/90 backdrop-blur-sm">
-                            <button
-                                aria-label="Close"
-                                onClick={() => setPaymentResult(null)}
-                                className="w-10 h-10 rounded-xl bg-white border-[3px] border-[#111111] shadow-[3px_3px_0px_#111111] flex items-center justify-center text-[#111111] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-                            >
-                                <X size={20} strokeWidth={2.5} />
-                            </button>
-                        </header>
-
-                        {/* Celebration Hero: rocket launch + confetti burst */}
-                        <div
-                            className="relative w-full h-56 flex flex-col items-center justify-center overflow-hidden pt-2 cursor-pointer select-none"
-                            onClick={() => setCelebrationKey(k => k + 1)}
-                            title="Tap the rocket to launch again!"
-                        >
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                                <div className="absolute w-3 h-3 bg-[#fd5835] border-[1.5px] border-[#111111] rounded-sm burst-piece-1" />
-                                <div className="absolute w-2.5 h-2.5 rounded-full bg-[#f6bf22] border-[1.5px] border-[#111111] burst-piece-2" />
-                                <div className="absolute w-3.5 h-2 bg-[#2e5bff] border-[1.5px] border-[#111111] rounded-sm burst-piece-3" />
-                                <div className="absolute w-3 h-3 bg-[#ccff00] border-[1.5px] border-[#111111] rotate-45 burst-piece-4" />
-                                <div className="absolute w-2.5 h-3.5 bg-[#b52603] border-[1.5px] border-[#111111] rounded-sm burst-piece-5" />
-                                <div className="absolute w-2 h-2 rounded-full bg-white border-[1.5px] border-[#111111] burst-piece-6" />
-
-                                <div className="absolute -top-1 left-10 anim-twinkle-star">
-                                    <Star size={28} fill="#f6bf22" className="text-[#f6bf22] drop-shadow-[1.5px_1.5px_0px_#111111]" />
-                                </div>
-                                <div className="absolute top-8 right-12 anim-twinkle-star" style={{ animationDelay: '0.4s' }}>
-                                    <Star size={22} fill="#fd5835" className="text-[#fd5835] drop-shadow-[1.5px_1.5px_0px_#111111]" />
-                                </div>
-                                <div className="absolute bottom-5 left-14 anim-twinkle-star" style={{ animationDelay: '0.8s' }}>
-                                    <Sparkles size={20} fill="#2e5bff" className="text-[#2e5bff]" />
-                                </div>
-                            </div>
-
-                            <div className="relative z-10 flex flex-col items-center anim-rocket-launch transition-transform active:scale-95">
-                                <div className="relative w-24 h-28 flex items-center justify-center">
-                                    <div className="relative w-16 h-[5.5rem] bg-white border-[3px] border-[#111111] rounded-t-full shadow-[3px_3px_0px_#111111] overflow-hidden flex flex-col items-center">
-                                        <div className="w-full h-7 bg-[#fd5835] border-b-[3px] border-[#111111]" />
-                                        <div className="w-6 h-6 rounded-full bg-[#2e5bff] border-[3px] border-[#111111] mt-2 flex items-center justify-center shadow-inner">
-                                            <div className="w-2 h-2 rounded-full bg-[#fcf9f8]" />
-                                        </div>
-                                        <div className="w-full h-2 bg-[#f6bf22] border-t-2 border-b-2 border-[#111111] mt-2" />
-                                    </div>
-                                    <div className="absolute -left-2 bottom-3 w-5 h-8 bg-[#b52603] border-[3px] border-[#111111] rounded-tl-xl -rotate-12 shadow-[2px_2px_0px_#111111]" />
-                                    <div className="absolute -right-2 bottom-3 w-5 h-8 bg-[#b52603] border-[3px] border-[#111111] rounded-tr-xl rotate-12 shadow-[2px_2px_0px_#111111]" />
-                                </div>
-
-                                <div className="flex flex-col items-center -mt-2 anim-flame">
-                                    <div className="w-7 h-10 bg-[#fd5835] border-[3px] border-[#111111] rounded-b-full shadow-[2px_2px_0px_#111111] flex items-center justify-center">
-                                        <div className="w-3.5 h-6 bg-[#f6bf22] rounded-b-full" />
-                                    </div>
-                                </div>
-
-                                <div className="relative w-28 h-6 flex justify-center items-center -mt-1 pointer-events-none">
-                                    <div className="absolute w-6 h-6 bg-zinc-200 border-2 border-[#111111] rounded-full anim-smoke-1" />
-                                    <div className="absolute w-5 h-5 bg-zinc-300 border-2 border-[#111111] rounded-full anim-smoke-2" />
-                                    <div className="absolute w-4 h-4 bg-zinc-200 border-2 border-[#111111] rounded-full anim-smoke-3" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Staggered Reveal Content */}
-                        <main className="px-4 flex flex-col items-center text-center -mt-2 z-20 flex-1">
-                            {/* Step 1: verified badge + amount */}
-                            <div className="seq-step-1 flex flex-col items-center w-full">
-                                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border-[3px] border-[#111111] shadow-[3px_3px_0px_#111111] mb-3">
-                                    <span className="w-5 h-5 rounded-full bg-[#2ed573] border-2 border-[#111111] flex items-center justify-center text-[#111111]">
-                                        <Check size={12} strokeWidth={3} />
-                                    </span>
-                                    <span className="text-[13px] leading-4 tracking-[0.03em] font-extrabold text-[#111111]">Payment Verified &amp; Confirmed</span>
-                                </div>
-                                <div className="flex items-baseline justify-center gap-1.5 my-1">
-                                    <span className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
-                                        {formatCurrency(paymentResult.finalAmount)}
-                                    </span>
-                                    <span className="text-[11px] leading-[14px] tracking-[0.04em] font-extrabold px-2 py-0.5 bg-[#f6bf22] border-2 border-[#111111] rounded-lg shadow-[2px_2px_0px_#111111] text-[#111111]">
-                                        INSTANT
-                                    </span>
-                                </div>
-                                {paymentResult.discountAmount > 0 && (
-                                    <p className="text-xs font-semibold text-zinc-500">
-                                        {paymentResult.discountLabel ? `${paymentResult.discountLabel} — ` : ''}
-                                        {formatCurrency(paymentResult.discountAmount)} saved
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Step 2: merchant info */}
-                            <div className="seq-step-2 w-full max-w-sm bg-white border-[3px] border-[#111111] rounded-2xl p-3 shadow-[4px_4px_0px_#111111] mt-2.5 flex items-center gap-3 text-left">
-                                <div className="w-12 h-12 rounded-xl bg-[#2e5bff] border-[3px] border-[#111111] shadow-[2px_2px_0px_#111111] flex items-center justify-center text-[18px] font-extrabold text-white shrink-0 overflow-hidden">
-                                    <RestaurantPhoto
-                                        src={restaurant?.imageUrl}
-                                        alt={restaurant?.name ?? 'Restaurant'}
-                                        className="w-full h-full object-cover"
-                                        fallback={<>{restaurant ? getInitials(restaurant.name) : '—'}</>}
-                                    />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <h2 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111] truncate">
-                                            {restaurant?.name ?? 'Restaurant'}
-                                        </h2>
-                                        <BadgeCheck size={16} className="text-[#2e5bff] shrink-0" aria-label="Loyalty partner" />
-                                    </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <span className="text-[11px] leading-[14px] font-bold text-[#434656] block">
-                                        {successTimestamp ? formatResultDate(successTimestamp) : 'Today'}
-                                    </span>
-                                    <span className="text-xs leading-4 font-bold text-[#111111] block">
-                                        {successTimestamp ? formatResultTime(successTimestamp) : ''}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Step 3: loyalty progress, or free-item confirmation */}
-                            {successCard && successTheme ? (
-                                <section aria-label="Loyalty progress" className="seq-step-3 w-full mt-5 text-left">
-                                    <div
-                                        className="w-full border-[3px] border-[#111111] rounded-2xl p-3 shadow-[4px_4px_0px_#111111] relative overflow-hidden select-none"
-                                        style={{ backgroundColor: successTheme.bg }}
-                                    >
-                                        <div className="flex items-center justify-between relative z-10">
-                                            <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-extrabold tracking-wider uppercase", successTheme.badge)}>
-                                                <span className="w-2 h-2 rounded-full bg-[#ccff00]" />
-                                                {successCard.name}
-                                            </span>
-                                            <span className={cn("text-xs font-extrabold tracking-wide", successTheme.text)}>
-                                                {successUnlockedCount}/{successTotalCount} UNLOCKED
-                                            </span>
-                                        </div>
-
-                                        <div className={cn("mt-3 pt-2.5 relative z-10 border-t", successTheme.text === 'text-white' ? 'border-white/20' : 'border-black/10')}>
-                                            <div className="grid grid-cols-5 gap-1.5">
-                                                {successCard.items.map(item => {
-                                                    const isNew = item.id === successItemId
-                                                    return (
-                                                        <div key={item.id} className="flex flex-col items-center gap-1 relative">
-                                                            {isNew ? (
-                                                                <div className="relative flex items-center justify-center">
-                                                                    <div className="absolute inset-0 rounded-full border-2 border-[#ffc72c] seq-stamp-ring pointer-events-none" />
-                                                                    <div className="w-8 h-8 rounded-full bg-[#f6bf22] text-[#111111] border-[2.5px] border-[#111111] flex items-center justify-center shadow-[2px_2px_0px_#111111] seq-stamp-pop z-10">
-                                                                        <Star size={17} fill="currentColor" />
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div
-                                                                    className={cn(
-                                                                        "w-8 h-8 rounded-full flex items-center justify-center text-sm font-black",
-                                                                        item.redeemed
-                                                                            ? "bg-white border-2 border-[#111111] shadow-[1px_1px_0px_#111111]"
-                                                                            : "bg-white/10 border-[1.5px] border-dashed border-white/50 text-white/80"
-                                                                    )}
-                                                                    style={item.redeemed ? { color: successTheme.checkedText } : undefined}
-                                                                >
-                                                                    {item.redeemed ? (
-                                                                        <Check size={16} strokeWidth={3} />
-                                                                    ) : item.rewardType === 'freeItem' ? (
-                                                                        item.freeItemName?.toLowerCase().includes('meal') ? <Cake size={14} /> : <Gift size={14} />
-                                                                    ) : (
-                                                                        item.stampsRequired
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <span className={cn("text-[11px] font-bold leading-none text-center truncate w-full", isNew ? "text-[#f6bf22] font-extrabold" : successTheme.mutedText)}>
-                                                                {rewardLabel(item)}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-
-                                        <div className={cn("mt-3 pt-2.5 border-t flex items-center justify-between relative z-10", successTheme.text === 'text-white' ? 'border-white/15' : 'border-black/10')}>
-                                            <div className="flex items-center gap-1.5">
-                                                <Sparkles size={16} className="text-[#f6bf22]" />
-                                                <p className={cn("text-xs font-bold", successTheme.text)}>
-                                                    {successNextReward
-                                                        ? `Next reward at ${successNextReward.stampsRequired}${ordinal(successNextReward.stampsRequired)} visit`
-                                                        : 'All rewards unlocked!'}
-                                                </p>
-                                            </div>
-                                            <span className={cn("text-xs font-mono font-bold", successTheme.mutedText)}>
-                                                #{successCard.id.slice(-6).toUpperCase()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </section>
-                            ) : paymentResult.freeItemName ? (
-                                <div className="seq-step-3 w-full mt-5 bg-white border-[3px] border-[#111111] rounded-2xl p-4 shadow-[4px_4px_0px_#111111] flex items-center gap-2 text-left">
-                                    <Gift size={20} className="text-[#111111] shrink-0" />
-                                    <p className="text-sm font-bold text-[#111111]">🎁 {paymentResult.freeItemName} redeemed</p>
-                                </div>
-                            ) : null}
-
-                            {/* Step 4: Done */}
-                            <div className="seq-step-4 w-full mt-5 pb-4">
-                                <button
-                                    onClick={() => setPaymentResult(null)}
-                                    className="w-full h-14 bg-[#ccff00] text-[#111111] text-[15px] leading-[18px] tracking-[0.02em] font-extrabold rounded-2xl border-[3px] border-[#111111] shadow-[4px_4px_0px_#111111] flex items-center justify-center gap-2 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
-                                >
-                                    Done
-                                </button>
-                            </div>
-                        </main>
                     </div>
                 </div>
             )}

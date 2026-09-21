@@ -117,11 +117,6 @@ export default function TransactionsPage() {
     const [isDrawerVisible, setIsDrawerVisible] = useState(false)
     const drawerCloseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Surfaced when a UPI payment is found and reconciled here that never
-    // got recorded on the payment page itself (e.g. the tab/PWA was closed
-    // before the user returned to it) — see the reconciliation effect below.
-    const [reconciledBanner, setReconciledBanner] = useState<{ type: 'success' | 'failed'; message: string } | null>(null)
-
     useEffect(() => {
         // Wait for AuthContext to finish reading localStorage before
         // deciding there's no one logged in — on a fresh page load this
@@ -151,17 +146,13 @@ export default function TransactionsPage() {
 
         const reconcileAndFetch = async () => {
             // A safety net for a payment that succeeded in the UPI app but
-            // never made it into a transaction — the restaurant payment
-            // page couldn't confirm it (tab/PWA closed) and the user came
-            // straight here instead of back to that page. Runs before the
-            // list fetch so a just-reconciled payment is already included.
+            // never made it into a transaction. Runs before the list fetch so
+            // a just-recorded payment is already included. Telling the
+            // customer about it (the payment-successful screen) is done
+            // app-wide by PaymentRecovery; this check is shared with it, so
+            // the payment is only ever verified and recorded once.
             try {
-                const result = await verifyPendingUpiPayment()
-                if (result.outcome === 'success') {
-                    setReconciledBanner({ type: 'success', message: 'Found a completed payment and added it to your transactions.' })
-                } else if (result.outcome === 'failed') {
-                    setReconciledBanner({ type: 'failed', message: result.message })
-                }
+                await verifyPendingUpiPayment()
             } catch (err) {
                 console.error('Failed to verify a pending UPI payment', err)
             }
@@ -170,12 +161,6 @@ export default function TransactionsPage() {
 
         reconcileAndFetch()
     }, [user, isInitialized, router])
-
-    useEffect(() => {
-        if (!reconciledBanner) return
-        const timeout = setTimeout(() => setReconciledBanner(null), 6000)
-        return () => clearTimeout(timeout)
-    }, [reconciledBanner])
 
     const filteredTransactions = useMemo(() => {
         const query = searchQuery.trim().toLowerCase()
@@ -239,18 +224,6 @@ export default function TransactionsPage() {
 
             {/* Scrollable Content Canvas */}
             <main className="flex-1 px-4 pt-4 pb-6 max-w-2xl w-full mx-auto">
-                {reconciledBanner && (
-                    <div
-                        className={cn(
-                            "mb-4 px-4 py-3 rounded-xl neo-border neo-shadow-badge flex items-start gap-2.5 text-sm font-bold",
-                            reconciledBanner.type === 'success' ? "bg-[#d1fae5] text-[#065f46]" : "bg-[#ffdad6] text-[#93000a]"
-                        )}
-                    >
-                        {reconciledBanner.type === 'success' ? <BadgeCheck size={18} className="shrink-0 mt-0.5" /> : <HelpCircle size={18} className="shrink-0 mt-0.5" />}
-                        <span>{reconciledBanner.message}</span>
-                    </div>
-                )}
-
                 {/* Search */}
                 <div className="relative mb-5">
                     <input

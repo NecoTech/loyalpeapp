@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Inter } from 'next/font/google'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Zap } from 'lucide-react'
 import jsQR from 'jsqr'
 import { cn } from '../../../lib/utils'
 import { extractUpiVpa } from '../../../lib/upi'
@@ -32,6 +32,9 @@ export default function ScanPage() {
 
     const [status, setStatus] = useState<Status>('requesting')
     const [errorMessage, setErrorMessage] = useState('')
+    const [isFlashOn, setIsFlashOn] = useState(false)
+    const [flashNotice, setFlashNotice] = useState('')
+    const flashNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const stopCamera = useCallback(() => {
         if (frameRef.current !== null) {
@@ -40,7 +43,35 @@ export default function ScanPage() {
         }
         streamRef.current?.getTracks().forEach(track => track.stop())
         streamRef.current = null
+        // Stopping the camera switches the torch off with it.
+        setIsFlashOn(false)
     }, [])
+
+    const showFlashNotice = useCallback((message: string) => {
+        setFlashNotice(message)
+        if (flashNoticeTimerRef.current) clearTimeout(flashNoticeTimerRef.current)
+        flashNoticeTimerRef.current = setTimeout(() => setFlashNotice(''), 2500)
+    }, [])
+
+    // The flashlight is the camera's "torch" constraint. Many devices (most
+    // desktops, iPhones in Safari) don't expose it, so check before trying.
+    const toggleFlash = useCallback(async () => {
+        const track = streamRef.current?.getVideoTracks()[0]
+        const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
+        if (!track || !capabilities?.torch) {
+            showFlashNotice("Flash isn't available on this device.")
+            return
+        }
+
+        const next = !isFlashOn
+        try {
+            await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
+            setIsFlashOn(next)
+        } catch (err) {
+            console.error('Failed to toggle flash', err)
+            showFlashNotice("Couldn't turn the flash on.")
+        }
+    }, [isFlashOn, showFlashNotice])
 
     const handleDecoded = useCallback(async (text: string) => {
         if (hasResolvedRef.current) return
@@ -148,6 +179,7 @@ export default function ScanPage() {
         return () => {
             cancelled = true
             stopCamera()
+            if (flashNoticeTimerRef.current) clearTimeout(flashNoticeTimerRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -170,9 +202,9 @@ export default function ScanPage() {
                     onClick={() => { stopCamera(); router.back() }}
                     aria-label="Go back"
                     type="button"
-                    className="absolute left-6 w-11 h-11 rounded-full bg-zinc-800/80 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-95 transition-transform hover:bg-zinc-700/80"
+                    className="absolute left-6 w-11 h-11 rounded-xl bg-white border-[2.5px] border-black flex items-center justify-center text-black shadow-[3px_3px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
                 >
-                    <ArrowLeft size={22} />
+                    <ArrowLeft size={22} strokeWidth={2.5} />
                 </button>
                 <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-md">
                     Scan QR
@@ -180,23 +212,50 @@ export default function ScanPage() {
             </header>
 
             {/* Scanner Viewfinder */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-20">
-                <div className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-3xl border-[3.5px] border-[#B4F82C] shadow-[0_0_16px_rgba(180,248,44,0.45),inset_0_0_12px_rgba(180,248,44,0.25)] overflow-hidden bg-black/10">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto -mt-6">
+                <div className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-3xl border-[3.5px] border-[#B4F82C] shadow-[0_0_16px_rgba(180,248,44,0.45),inset_0_0_12px_rgba(180,248,44,0.25)] overflow-hidden bg-black/10 backdrop-contrast-125">
                     <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-white/60" />
                     <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-white/60" />
                     <div className="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-white/60" />
                     <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-white/60" />
                 </div>
                 <p className="mt-6 text-sm font-medium text-zinc-300 tracking-wide text-center drop-shadow">
-                    {status === 'requesting' && 'Requesting camera access...'}
-                    {status === 'scanning' && 'Align QR code within frame'}
-                    {status === 'resolving' && 'Matching restaurant...'}
-                    {status === 'error' && errorMessage}
+                    {flashNotice}
+                    {!flashNotice && status === 'requesting' && 'Requesting camera access...'}
+                    {!flashNotice && status === 'scanning' && 'Align QR code within frame'}
+                    {!flashNotice && status === 'resolving' && 'Matching restaurant...'}
+                    {!flashNotice && status === 'error' && errorMessage}
                 </p>
             </main>
 
-            {/* Bottom safe-area spacer */}
-            <footer className="relative z-20 w-full pb-8 pt-2 px-6 max-w-md mx-auto" />
+            {/* Bottom Controls */}
+            <footer className="relative z-20 w-full pb-8 pt-2 px-6 flex flex-col items-center max-w-md mx-auto">
+                <div className="flex items-center justify-center gap-6 mb-5">
+                    <button
+                        type="button"
+                        onClick={toggleFlash}
+                        aria-label="Toggle flashlight"
+                        aria-pressed={isFlashOn}
+                        className={cn(
+                            "px-5 h-12 rounded-2xl bg-zinc-900 border-2 flex items-center justify-center gap-2.5 text-white shadow-[3px_3px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none hover:border-[#B4F82C] transition-all cursor-pointer select-none",
+                            isFlashOn ? "border-[#B4F82C]" : "border-white/80"
+                        )}
+                    >
+                        <Zap size={22} strokeWidth={2.5} fill="currentColor" className="text-[#B4F82C]" />
+                        <span className="text-xs font-bold tracking-wider uppercase text-white">Flash</span>
+                    </button>
+                </div>
+
+                <div className="mt-4 flex items-center justify-center gap-3 opacity-60 text-[10px] tracking-wider uppercase font-semibold text-zinc-400">
+                    <span>GPay</span>
+                    <span>•</span>
+                    <span>PhonePe</span>
+                    <span>•</span>
+                    <span>Paytm</span>
+                    <span>•</span>
+                    <span>BHIM UPI</span>
+                </div>
+            </footer>
         </div>
     )
 }

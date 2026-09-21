@@ -23,9 +23,15 @@ function imagesDir() {
 // picture" a plain overwrite. Pictures are always stored as JPEG (see isJpeg).
 // Profile photos keep the original bare-hash name so ones uploaded before
 // banners existed are still found.
+//
+// The folder is decided at runtime (an env var, or the working directory) and
+// holds uploads, not source files. Turbopack can't tell which files such a
+// path might reach, so it would trace the whole project into the server
+// output — the turbopackIgnore comments tell it this path isn't part of the
+// build, which is what silences the "Dynamic filesystem access" warning.
 function imagePathFor(restaurantId: string, kind: RestaurantImageKind) {
     const name = crypto.createHash('sha256').update(restaurantId).digest('hex').slice(0, 40)
-    return path.join(imagesDir(), kind === 'banner' ? `${name}-banner.jpg` : `${name}.jpg`)
+    return path.join(/*turbopackIgnore: true*/ imagesDir(), kind === 'banner' ? `${name}-banner.jpg` : `${name}.jpg`)
 }
 
 // Writes to a temporary file and renames it over the real one, so a customer
@@ -47,7 +53,7 @@ export async function saveRestaurantImage(restaurantId: string, bytes: Buffer, k
 
 export async function readRestaurantImage(restaurantId: string, kind: RestaurantImageKind = 'profile'): Promise<Buffer | null> {
     try {
-        return await fs.readFile(imagePathFor(restaurantId, kind))
+        return await fs.readFile(/*turbopackIgnore: true*/ imagePathFor(restaurantId, kind))
     } catch (error: any) {
         if (error?.code === 'ENOENT') return null
         throw error

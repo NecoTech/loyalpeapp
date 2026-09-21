@@ -203,8 +203,22 @@ export default function ScanPage() {
     ]
 
     return (
-        <div className={cn(inter.className, "antialiased overflow-hidden flex justify-center items-center min-h-screen bg-white text-white")}>
-            <div className="relative w-full max-w-[420px] h-[100dvh] max-h-[900px] overflow-hidden bg-white flex flex-col justify-between select-none rounded-[44px]">
+        <div className={cn(inter.className, "antialiased relative w-full h-[100dvh] overflow-hidden bg-white text-white select-none")}>
+            {/* Camera feed — edge to edge, behind everything, at any screen width */}
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-neutral-100">
+                <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover object-center filter brightness-90 scale-105"
+                    muted
+                    playsInline
+                />
+                {/* Fades the feed into white for the controls at the bottom */}
+                <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0)_0%,rgba(255,255,255,0)_55%,rgba(255,255,255,0.8)_75%,rgb(255,255,255)_90%,rgb(255,255,255)_100%)]" />
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* Controls, kept to a phone-width column on wide screens */}
+            <div className="relative z-10 mx-auto w-full max-w-[420px] h-full flex flex-col justify-between">
                 <button
                     type="button"
                     aria-label="Go back"
@@ -213,20 +227,6 @@ export default function ScanPage() {
                 >
                     <ArrowLeft className="w-6 h-6 text-[#111111]" strokeWidth={2.5} />
                 </button>
-                <div className="absolute top-0 left-0 right-0 w-full bg-white z-10 pointer-events-none h-6" />
-
-                {/* Camera feed */}
-                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-neutral-100">
-                    <video
-                        ref={videoRef}
-                        className="w-full h-full object-cover object-center filter brightness-90 scale-105"
-                        muted
-                        playsInline
-                    />
-                    {/* Fades the feed into white for the controls at the bottom */}
-                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0)_0%,rgba(255,255,255,0)_55%,rgba(255,255,255,0.8)_75%,rgb(255,255,255)_90%,rgb(255,255,255)_100%)]" />
-                </div>
-                <canvas ref={canvasRef} className="hidden" />
 
                 <main className="relative z-10 flex flex-col items-center justify-center px-6 flex-grow my-auto">
                     {/* Guidance */}

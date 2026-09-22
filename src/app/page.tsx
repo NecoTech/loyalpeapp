@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus_Jakarta_Sans } from 'next/font/google'
+import Image from 'next/image'
+import { Plus_Jakarta_Sans, Syne } from 'next/font/google'
 import {
     MapPin,
     ArrowRight,
@@ -15,7 +16,6 @@ import {
     X,
     User,
     Store,
-    Gift,
     Bell,
     UserRound,
 } from 'lucide-react'
@@ -24,10 +24,12 @@ import { useLocation, useCityCounts, getCityOptions } from './context/LocationCo
 import { hasSeenOnboarding } from '../../lib/onboarding'
 import { normalizeCityName } from '../../lib/cities'
 import { cn } from '../../lib/utils'
-import { secureFetch } from '../../lib/secureFetch'
+import { readHomeCache, refreshHomeData, type RecentShop } from '../../lib/homeCache'
+import { PAYMENT_RECORDED_EVENT } from '../../lib/pendingUpiPayment'
 import { supportWhatsAppUrl } from '../../lib/support'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
+const syne = Syne({ subsets: ['latin'], weight: ['700', '800'] })
 
 function getInitials(name?: string) {
     if (!name) return null
@@ -41,13 +43,6 @@ function getInitials(name?: string) {
 
 function formatCurrency(amount: number) {
     return `₹${amount.toFixed(2)}`
-}
-
-type RecentShop = {
-    id: string
-    name: string
-    category: string | null
-    stamps: { redeemed: number; total: number } | null
 }
 
 // The two card colourways from the design, alternated per shop. Picked from
@@ -77,10 +72,12 @@ export default function Home() {
     const { user, isInitialized } = useAuth()
     const { selectedCity, setSelectedCity } = useLocation()
     const cityCounts = useCityCounts()
-    const [totalSaved, setTotalSaved] = useState(0)
-    // null = still loading for a signed-in customer, so the new-user card
-    // isn't flashed at someone whose shops simply haven't arrived yet.
+    // null = not known yet (nothing cached and the first fetch hasn't landed),
+    // shown as a placeholder — never as a made-up ₹0.00 or the new-user card.
+    const [totalSaved, setTotalSaved] = useState<number | null>(null)
     const [recentShops, setRecentShops] = useState<RecentShop[] | null>(null)
+    // Bumped when a payment is recorded so both cards are fetched again.
+    const [dataRefreshKey, setDataRefreshKey] = useState(0)
     const [readyToRender, setReadyToRender] = useState(false)
 
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
@@ -111,47 +108,47 @@ export default function Home() {
         setReadyToRender(true)
     }, [user, isInitialized, router])
 
+    const userId = user?.email || user?.phoneNumber
+
+    // Paint what was last fetched for this account straight away — this runs in
+    // the same pass that makes the page visible, so the cards are never seen
+    // empty — then the effect below refreshes them in the background.
     useEffect(() => {
-        const userId = user?.email || user?.phoneNumber
+        if (!isInitialized) return
         if (!userId) {
             setTotalSaved(0)
-            return
-        }
-
-        const fetchSavings = async () => {
-            try {
-                const { data } = await secureFetch(`/api/loyalty/savings?userId=${encodeURIComponent(userId)}`)
-                if (data?.success) setTotalSaved(data.totalSaved)
-            } catch (err) {
-                console.error('Failed to load savings total', err)
-            }
-        }
-        fetchSavings()
-    }, [user?.email, user?.phoneNumber])
-
-    useEffect(() => {
-        const userId = user?.email || user?.phoneNumber
-        if (!userId) {
             setRecentShops([])
             return
         }
+        const cached = readHomeCache(userId)
+        setTotalSaved(cached?.totalSaved ?? null)
+        setRecentShops(cached?.recentShops ?? null)
+    }, [isInitialized, userId])
 
-        setRecentShops(null)
+    useEffect(() => {
+        if (!isInitialized || !userId) return
+
         let cancelled = false
-        const fetchRecentShops = async () => {
-            try {
-                const { data } = await secureFetch(`/api/loyalty/recent-shops?userId=${encodeURIComponent(userId)}`)
-                if (!cancelled) setRecentShops(data?.success ? data.shops : [])
-            } catch (err) {
-                console.error('Failed to load recent shops', err)
-                if (!cancelled) setRecentShops([])
-            }
-        }
-        fetchRecentShops()
+        refreshHomeData(userId).then(fresh => {
+            if (cancelled) return
+            // A part that couldn't be fetched keeps what's already showing; if
+            // there's nothing at all, settle on an empty state rather than
+            // leaving a placeholder up forever.
+            setTotalSaved(prev => fresh.totalSaved ?? prev ?? 0)
+            setRecentShops(prev => fresh.recentShops ?? prev ?? [])
+        })
         return () => {
             cancelled = true
         }
-    }, [user?.email, user?.phoneNumber])
+    }, [isInitialized, userId, dataRefreshKey])
+
+    // A payment made from anywhere (including one recovered after the app was
+    // closed) changes both cards.
+    useEffect(() => {
+        const onPaymentRecorded = () => setDataRefreshKey(k => k + 1)
+        window.addEventListener(PAYMENT_RECORDED_EVENT, onPaymentRecorded)
+        return () => window.removeEventListener(PAYMENT_RECORDED_EVENT, onPaymentRecorded)
+    }, [])
 
     const openShop = (id: string) => {
         localStorage.setItem('lastVisitedRestaurantId', id)
@@ -248,9 +245,14 @@ export default function Home() {
         <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col w-full max-w-[428px] mx-auto relative bg-white text-[#1c1b1b] pb-32 selection:bg-[#f6bf22] selection:text-[#1c1b1b]")}>
             {/* Top Navigation App Bar */}
             <header className="w-full px-4 pt-4 pb-3 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30">
-                <span className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
-                    loyalpe
-                </span>
+                <Image
+                    src="/logo.png"
+                    alt="loyalpe"
+                    width={176}
+                    height={88}
+                    priority
+                    className="h-14 w-auto"
+                />
                 <div className="flex items-center gap-2">
                     <button
                         onClick={openCityModal}
@@ -332,9 +334,13 @@ export default function Home() {
                         </div>
                     </div>
                     <div className="flex items-baseline justify-between pt-1 border-t-2 border-dashed border-[#111111]/15 mt-1">
-                        <div className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
-                            {formatCurrency(totalSaved)}
-                        </div>
+                        {totalSaved === null ? (
+                            <div aria-label="Loading saved money" className="h-[38px] w-32 rounded-lg bg-[#111111]/10 animate-pulse" />
+                        ) : (
+                            <div className="text-[32px] leading-[38px] tracking-[-0.025em] font-extrabold text-[#111111]">
+                                {formatCurrency(totalSaved)}
+                            </div>
+                        )}
                         <button
                             onClick={() => requireAuth('/transactions') && router.push('/transactions')}
                             className="px-3.5 py-1.5 bg-[#FAF7F0] hover:bg-[#ffdf99] neo-border rounded-full neo-shadow-badge text-[#111111] text-[13px] leading-[16px] tracking-[0.03em] font-extrabold flex items-center gap-1 active-press transition-all cursor-pointer"
@@ -353,8 +359,14 @@ export default function Home() {
                         className="bg-[#D8B4FE] neo-border rounded-2xl neo-shadow-2 p-4 flex flex-col justify-between min-h-[145px] active-press-lg transition-transform cursor-pointer text-left"
                     >
                         <div className="flex justify-between items-start">
-                            <div className="w-11 h-11 rounded-full bg-[#111111] text-white flex items-center justify-center text-[17px] font-extrabold neo-shadow-badge border-2 border-white">
-                                {initials ? initials : <User size={20} />}
+                            <div className="relative flex items-center justify-center">
+                                <div className="w-11 h-11 rounded-xl bg-white border-[2.5px] border-black shadow-[2px_2px_0px_#000000] flex items-center justify-center text-[#111111] shrink-0">
+                                    {initials ? (
+                                        <span className="text-[17px] leading-none font-extrabold tracking-tight text-[#111111] select-none">{initials}</span>
+                                    ) : (
+                                        <User size={24} strokeWidth={2.5} className="text-[#111111]" />
+                                    )}
+                                </div>
                             </div>
                         </div>
                         <div className="mt-3">
@@ -382,78 +394,66 @@ export default function Home() {
                 </section>
 
                 {/* Recent Shops */}
-                {recentShops !== null && (
-                    <section className="w-full flex flex-col gap-3">
-                        <div className="flex items-center justify-between px-1">
-                            <div className="flex items-center gap-1.5">
-                                <Store size={18} className="text-[#111111]" />
-                                <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Recent Shops</h3>
-                            </div>
+                <section className="w-full flex flex-col gap-3">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-1.5">
+                            <Store size={18} className="text-[#111111]" />
+                            <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Recent Shops</h3>
                         </div>
+                    </div>
 
-                        {recentShops.length > 0 ? (
-                            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-1 -mx-4 px-4">
-                                {recentShops.map(shop => {
-                                    const palette = recentShopPalette(shop.id)
-                                    return (
-                                        <div
-                                            key={shop.id}
-                                            onClick={() => openShop(shop.id)}
-                                            className="w-36 border-2 border-[#111111] rounded-xl shadow-[2px_2px_0px_#111111] p-2.5 flex flex-col justify-between shrink-0 active-press transition-transform cursor-pointer bg-white"
-                                        >
-                                            <div className="flex items-start justify-between mb-1.5 min-w-0">
-                                                <span className={cn("max-w-full truncate px-2 py-0.5 border border-[#111111] rounded-full text-[9px] font-black uppercase tracking-wider", palette.pill)}>
-                                                    {shop.category || 'Partner'}
-                                                </span>
-                                            </div>
-                                            <div className="mb-2">
-                                                <h4 className="text-xs font-black text-[#111111] truncate">{shop.name}</h4>
-                                                {shop.stamps && (
-                                                    <div className="inline-flex items-center gap-1 mt-0.5 bg-white border border-[#111111] rounded px-1.5 py-0.5 text-[9px] font-black text-[#111111]">
-                                                        <Star size={12} fill="currentColor" className={palette.star} />
-                                                        <span>{shop.stamps.redeemed}/{shop.stamps.total} Stamps</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                aria-label={`View ${shop.name}`}
-                                                className={cn("w-full py-1 px-2 border border-[#111111] rounded-lg text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer leading-none shadow-[2px_2px_0px_#000000]", palette.button)}
-                                            >
-                                                <span>View</span>
-                                            </button>
+                    {recentShops === null ? (
+                        <div aria-label="Loading recent shops" className="flex gap-3 overflow-hidden pb-2 pt-1 -mx-4 px-4">
+                            {[0, 1].map(i => (
+                                <div key={i} className="w-36 h-[104px] shrink-0 rounded-xl border-2 border-[#111111]/10 bg-[#111111]/5 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : recentShops.length > 0 ? (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-1 -mx-4 px-4">
+                            {recentShops.map(shop => {
+                                const palette = recentShopPalette(shop.id)
+                                return (
+                                    <div
+                                        key={shop.id}
+                                        onClick={() => openShop(shop.id)}
+                                        className="w-36 border-2 border-[#111111] rounded-xl shadow-[2px_2px_0px_#111111] p-2.5 flex flex-col justify-between shrink-0 active-press transition-transform cursor-pointer bg-white"
+                                    >
+                                        <div className="flex items-start justify-between mb-1.5 min-w-0">
+                                            <span className={cn("max-w-full truncate px-2 py-0.5 border border-[#111111] rounded-full text-[9px] font-black uppercase tracking-wider", palette.pill)}>
+                                                {shop.category || 'Partner'}
+                                            </span>
                                         </div>
-                                    )
-                                })}
-                            </div>
-                        ) : (
-                            <div className="w-full bg-white neo-border rounded-2xl neo-shadow-2 p-5 flex flex-col gap-3 relative overflow-hidden">
-                                <div className="flex items-start justify-between">
-                                    <div className="w-12 h-12 rounded-xl bg-[#D4F63D] neo-border neo-shadow-badge flex items-center justify-center text-[#111111]">
-                                        <Gift size={26} />
+                                        <div className="mb-2">
+                                            <h4 className="text-xs font-black text-[#111111] truncate">{shop.name}</h4>
+                                            {shop.stamps && (
+                                                <div className="inline-flex items-center gap-1 mt-0.5 bg-white border border-[#111111] rounded px-1.5 py-0.5 text-[9px] font-black text-[#111111]">
+                                                    <Star size={12} fill="currentColor" className={palette.star} />
+                                                    <span>{shop.stamps.redeemed}/{shop.stamps.total} Stamps</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            aria-label={`View ${shop.name}`}
+                                            className={cn("w-full py-1 px-2 border border-[#111111] rounded-lg text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer leading-none shadow-[2px_2px_0px_#000000]", palette.button)}
+                                        >
+                                            <span>View</span>
+                                        </button>
                                     </div>
-                                    <span className="px-2.5 py-0.5 bg-[#70D6FF] neo-border rounded-full text-[10px] font-black text-[#111111] uppercase tracking-wider neo-shadow-badge">
-                                        Get Started
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">Start Earning Rewards</h4>
-                                    <p className="text-xs font-semibold text-[#434656] mt-1 leading-relaxed">
-                                        Scan your first QR at any partner cafe, salon, or store to unlock stamp cards and instant cash discounts.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => router.push('/restaurants')}
-                                    className="w-full py-2.5 px-3 bg-[#FAF7F0] hover:bg-[#f0edec] neo-border neo-shadow-badge rounded-xl text-xs font-black text-[#111111] uppercase tracking-wider flex items-center justify-center gap-1.5 active-press transition-all cursor-pointer"
-                                >
-                                    <span>Explore Nearby Shops</span>
-                                    <ArrowRight size={16} />
-                                </button>
-                            </div>
-                        )}
-                    </section>
-                )}
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="w-full p-6 flex flex-col items-center justify-center text-center">
+                            <h4 className={cn(syne.className, "text-[28px] font-extrabold lowercase tracking-tight leading-none text-center select-none")} style={{ letterSpacing: '-0.04em', color: '#d8dbe5' }}>
+                                no shop visited
+                            </h4>
+                            <p className="text-xs font-semibold mt-2.5 max-w-[260px] leading-relaxed text-center" style={{ color: '#a4a9b9' }}>
+                                Scan your QR code at partner spots to collect stamps &amp; perks
+                            </p>
+                        </div>
+                    )}
+                </section>
             </main>
 
             {/* Docked Neo-Brutalist Bottom Navigation */}

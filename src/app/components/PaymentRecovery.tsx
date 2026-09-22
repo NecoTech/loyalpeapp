@@ -13,8 +13,10 @@ import {
     readUnseenPaymentSuccess,
     verifyPendingUpiPayment,
     type PaymentFailedDetail,
+    type PaymentRecordedDetail,
     type UnseenPaymentSuccess,
 } from '../../../lib/pendingUpiPayment'
+import { refreshHomeData } from '../../../lib/homeCache'
 import { useAuth } from '../context/AuthContext'
 import PaymentSuccessScreen, { discountLabel, type LoyaltyCard } from './PaymentSuccessScreen'
 
@@ -156,7 +158,14 @@ export default function PaymentRecovery() {
     useEffect(() => {
         if (isAdminArea) return
 
-        const onRecorded = () => presentUnseenPayment()
+        const onRecorded = (event: Event) => {
+            presentUnseenPayment()
+            // The payment changes the home page's Saved Money and Recent
+            // Shops; refresh what's remembered for them so the home page is
+            // already right whenever it's opened next.
+            const paidBy = (event as CustomEvent<PaymentRecordedDetail>).detail?.payment?.userId
+            if (paidBy) void refreshHomeData(paidBy)
+        }
         const onFailed = (event: Event) => {
             setFailureMessage((event as CustomEvent<PaymentFailedDetail>).detail?.message || 'Payment was not completed.')
         }

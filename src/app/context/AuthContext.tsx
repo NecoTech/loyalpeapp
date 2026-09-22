@@ -3,6 +3,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { encrypt, decrypt } from '..//..//..//lib/encryption' // Import your encryption utilities
 import { secureFetch } from '../../../lib/secureFetch'
+import { clearHomeCache, refreshHomeData } from '../../../lib/homeCache'
 
 type User = {
   fullname: string
@@ -80,6 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem(AUTH_STORAGE_KEY)
+    // The home page's remembered figures belong to the account that's leaving.
+    clearHomeCache()
+  }
+
+  // Starts fetching the home page's data as soon as someone signs in, so it's
+  // already on the device (or nearly) by the time the home page opens.
+  const warmHomeData = (signedInUser: User) => {
+    const userId = signedInUser.email || signedInUser.phoneNumber
+    if (userId) void refreshHomeData(userId)
   }
 
   const register = (userData: User) => {
@@ -99,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       login(data.user as User)
+      warmHomeData(data.user as User)
       return { success: true }
     } catch (error) {
       console.error('Sign up error:', error)
@@ -118,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       login(data.user as User)
+      warmHomeData(data.user as User)
       return { success: true }
     } catch (error) {
       console.error('Sign in error:', error)

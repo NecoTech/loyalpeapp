@@ -12,19 +12,12 @@ import Login from '..//../components/Login'
 // import Register from '..//../components/Register'
 import { cn } from '..//..//..//..//lib/utils'
 import { secureFetch } from '..//..//..//..//lib/secureFetch'
-import PageLoader from '../../components/PageLoader'
 import { Search } from 'lucide-react'
-
-type Restaurant = {
-    id: string
-    name: string
-}
 
 function RestaurantContent() {
     const params = useParams()
     const { id } = params
     const router = useRouter()
-    const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
     const { user } = useAuth()
     const { setRestaurantId, clearCart } = useCart()
     const [showRegister, setShowRegister] = useState(false)
@@ -70,7 +63,6 @@ function RestaurantContent() {
 
     useEffect(() => {
         const fetchRestaurant = async () => {
-            setIsLoading(true)
             setError(null)
             setRestaurantNotFound(false)
 
@@ -87,7 +79,6 @@ function RestaurantContent() {
                     throw new Error('Restaurant not found')
                 }
 
-                setRestaurant(data.restaurant)
                 setRestaurantId(id as string)
                 localStorage.setItem('restaurantId', id as string);
 
@@ -220,11 +211,6 @@ function RestaurantContent() {
     //     )
     // }
 
-    // Show loading state
-    if (isLoading) {
-        return <PageLoader />
-    }
-
     // Show error if restaurant data failed to load (but not 404)
     if (error && !restaurantNotFound) {
         return (
@@ -250,32 +236,9 @@ function RestaurantContent() {
         )
     }
 
-    // Show error if restaurant is null but not a 404
-    if (!restaurant) {
-        return (
-            <div className={cn(
-                "min-h-screen flex items-center justify-center",
-                "bg-white dark:bg-zinc-900"
-            )}>
-                <div className="text-center">
-                    <p className="text-red-500 dark:text-red-400 text-lg mb-4">
-                        Failed to load restaurant
-                    </p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className={cn(
-                            "px-4 py-2 rounded transition-colors",
-                            "bg-[#FF385C] hover:bg-[#E31C5F] text-white"
-                        )}
-                    >
-                        Try Again
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
-    // Main restaurant page content
+    // Main restaurant page content. Rendered right away rather than behind a
+    // loading screen — LoyaltyMockup fetches and displays the restaurant's own
+    // details itself, so there's nothing to wait on here before showing it.
     return <LoyaltyMockup restaurantId={id as string} />
 }
 

@@ -251,7 +251,7 @@ export default function Home() {
                     width={176}
                     height={88}
                     priority
-                    className="h-14 w-auto"
+                    className="h-[75px] w-auto"
                 />
                 <div className="flex items-center gap-2">
                     <button

@@ -31,6 +31,14 @@ import { supportWhatsAppUrl } from '../../lib/support'
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 const syne = Syne({ subsets: ['latin'], weight: ['700', '800'] })
 
+// public/logo.png (707×353) has transparent padding around the wordmark — the
+// visible "l" starts 104px into the image. Shown as-is, that leaves the logo
+// visibly indented from the cards below it, so the header pulls the image left
+// by that padding (scaled to the rendered height) to line the wordmark up with
+// the cards' left edge. If the logo file is replaced, re-measure the 104.
+const LOGO_HEIGHT_PX = 75
+const LOGO_INK_LEFT_PX = (104 / 353) * LOGO_HEIGHT_PX
+
 function getInitials(name?: string) {
     if (!name) return null
     return name
@@ -251,7 +259,8 @@ export default function Home() {
                     width={176}
                     height={88}
                     priority
-                    className="h-[75px] w-auto"
+                    className="w-auto"
+                    style={{ height: LOGO_HEIGHT_PX, marginLeft: -LOGO_INK_LEFT_PX }}
                 />
                 <div className="flex items-center gap-2">
                     <button

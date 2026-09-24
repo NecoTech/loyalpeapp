@@ -27,8 +27,8 @@ export type CityOption = {
 
 // The original curated shortlist — shown as "Popular Cities" quick-picks in
 // every city picker. Not the only valid cities: see the search-to-select-
-// any-city flow in each picker, backed by useCityCounts() below for real
-// per-city restaurant counts (popular or not).
+// any-city flow in each picker, backed by useCityStats() below for real
+// per-city restaurant and deal counts (popular or not).
 export const CITIES: CityOption[] = [
     { name: 'Bengaluru', region: 'Karnataka, India', code: 'BLR', color: '#BEF264', Icon: Compass, iconBg: '#D1FAE5', iconColor: '#059669' },
     { name: 'Mumbai', region: 'Maharashtra, India', code: 'BOM', color: '#FFC72C', Icon: Building2, iconBg: '#DBEAFE', iconColor: '#2563EB' },
@@ -137,25 +137,36 @@ export function useLocation() {
     return context
 }
 
-// Real restaurant counts per city, keyed by the exact (normalized) city
-// name — covers every city with at least one restaurant, not just the
-// curated CITIES shortlist, so a searched/custom city can show a real
-// count too. Shared by every city-picker UI instead of each fetching its
-// own copy.
-export function useCityCounts() {
-    const [counts, setCounts] = useState<Record<string, number>>({})
+export type CityStats = {
+    // Restaurants per city — what decides which cities are listed first.
+    counts: Record<string, number>
+    // Deals per city — the rewards (discounts / free items) on those
+    // restaurants' loyalty cards; what the picker shows under each name.
+    deals: Record<string, number>
+}
+
+// Real per-city figures, keyed by the exact (normalized) city name — covers
+// every city with at least one restaurant, not just the curated CITIES
+// shortlist, so a searched/custom city can show real numbers too. Shared by
+// every city-picker UI instead of each fetching its own copy.
+export function useCityStats(): CityStats {
+    const [stats, setStats] = useState<CityStats>({ counts: {}, deals: {} })
 
     useEffect(() => {
         let cancelled = false
         secureFetch('/api/restaurants/city-counts')
             .then(({ data }) => {
-                if (!cancelled && data?.success) setCounts(data.counts)
+                if (!cancelled && data?.success) setStats({ counts: data.counts ?? {}, deals: data.deals ?? {} })
             })
-            .catch(error => console.error('Failed to load city counts', error))
+            .catch(error => console.error('Failed to load city stats', error))
         return () => {
             cancelled = true
         }
     }, [])
 
-    return counts
+    return stats
+}
+
+export function dealsLabel(count: number) {
+    return `${count} deal${count === 1 ? '' : 's'}`
 }

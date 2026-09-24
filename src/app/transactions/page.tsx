@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, JetBrains_Mono, Syne } from 'next/font/google'
 import {
     ArrowLeft,
     Search,
@@ -24,6 +24,7 @@ import RestaurantPhoto from '../components/RestaurantPhoto'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'] })
+const syne = Syne({ subsets: ['latin'], weight: ['700', '800'] })
 
 type Transaction = {
     id: string
@@ -208,6 +209,9 @@ export default function TransactionsPage() {
 
     const activeVisual = activeTransaction ? getMerchantVisual(activeTransaction.restaurantName) : null
 
+    // Nothing to search or list at all — the page is just the one centered line.
+    const hasNoTransactions = !isLoading && transactions.length === 0
+
     return (
         <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col bg-white text-[#1c1b1b] pb-10")}>
             {/* Top App Bar */}
@@ -223,31 +227,32 @@ export default function TransactionsPage() {
             </header>
 
             {/* Scrollable Content Canvas */}
-            <main className="flex-1 px-4 pt-4 pb-6 max-w-2xl w-full mx-auto">
+            <main className={cn("flex-1 px-4 pt-4 pb-6 max-w-2xl w-full mx-auto", hasNoTransactions && "flex flex-col items-center justify-center")}>
                 {/* Search */}
-                <div className="relative mb-5">
-                    <input
-                        type="text"
-                        placeholder="Search transactions..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full bg-white text-[#111111] placeholder:text-zinc-500 font-semibold text-sm py-3 pl-11 pr-4 neo-border rounded-xl neo-shadow-badge focus:outline-none focus:ring-0 focus:border-[#111111] transition-all"
-                    />
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#111111] pointer-events-none flex items-center">
-                        <Search size={20} />
-                    </span>
-                </div>
+                {!hasNoTransactions && (
+                    <div className="relative mb-5">
+                        <input
+                            type="text"
+                            placeholder="Search transactions..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full bg-white text-[#111111] placeholder:text-zinc-500 font-semibold text-sm py-3 pl-11 pr-4 neo-border rounded-xl neo-shadow-badge focus:outline-none focus:ring-0 focus:border-[#111111] transition-all"
+                        />
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#111111] pointer-events-none flex items-center">
+                            <Search size={20} />
+                        </span>
+                    </div>
+                )}
 
                 {isLoading ? (
                     <p className="text-center text-sm font-semibold text-[#434656] mt-8">Loading transactions...</p>
                 ) : groupedTransactions.length === 0 ? (
-                    <div className="flex flex-col items-center text-center gap-3 mt-12 bg-white neo-border rounded-xl neo-shadow-1 p-6">
-                        <div className="w-14 h-14 rounded-xl bg-[#f0edec] neo-border neo-shadow-badge text-[#111111] flex items-center justify-center">
-                            <Store size={24} />
-                        </div>
-                        <h3 className="text-[17px] leading-[22px] tracking-[-0.01em] font-bold text-[#111111]">No transactions yet</h3>
-                        <p className="text-xs leading-4 tracking-[0.01em] font-semibold text-[#434656] max-w-xs">
-                            Your payments will show up here once you start paying with loyalty rewards.
+                    <div className={cn("flex flex-col items-center justify-center text-center", !hasNoTransactions && "mt-16")}>
+                        <p
+                            className={cn(syne.className, "text-2xl sm:text-3xl select-none lowercase leading-none text-center")}
+                            style={{ fontWeight: 800, letterSpacing: '-0.04em', color: '#d8dbe5' }}
+                        >
+                            {hasNoTransactions ? 'no transactions yet' : 'no matches found'}
                         </p>
                     </div>
                 ) : (

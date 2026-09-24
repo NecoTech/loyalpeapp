@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus_Jakarta_Sans } from 'next/font/google'
-import { ArrowLeft, MapPin, Search, Store, X } from 'lucide-react'
-import { useLocation, useCityCounts, getCityOptions } from '../context/LocationContext'
+import { Plus_Jakarta_Sans, Syne } from 'next/font/google'
+import { ArrowLeft, MapPin, Search, X } from 'lucide-react'
+import { useLocation, useCityStats, dealsLabel, getCityOptions } from '../context/LocationContext'
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
 import RestaurantPhoto from '../components/RestaurantPhoto'
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['500', '700', '800'] })
+const syne = Syne({ subsets: ['latin'], weight: ['700', '800'] })
 
 type RestaurantSummary = {
     id: string
@@ -50,7 +51,7 @@ function avatarColor(id: string) {
 export default function RestaurantsPage() {
     const router = useRouter()
     const { selectedCity, setSelectedCity } = useLocation()
-    const cityCounts = useCityCounts()
+    const { counts: cityCounts, deals: cityDeals } = useCityStats()
 
     const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -217,23 +218,18 @@ export default function RestaurantsPage() {
                 </section>
 
                 {/* Restaurant Grid */}
-                <main className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3.5">
-                        {isLoading ? (
-                            <p className="col-span-2 text-center text-sm font-bold text-zinc-500 mt-8">Loading restaurants...</p>
-                        ) : filtered.length === 0 ? (
-                            <div className="col-span-2 flex flex-col items-center text-center gap-3 mt-12">
-                                <div className="w-14 h-14 rounded-full bg-white brutal-border brutal-shadow-sm text-[#121212] flex items-center justify-center">
-                                    <Store size={24} />
-                                </div>
-                                <p className="text-sm font-bold text-zinc-500 max-w-xs">
-                                    {restaurants.length === 0
-                                        ? `No restaurants in ${selectedCity} yet.`
-                                        : 'No restaurants match your search.'}
-                                </p>
-                            </div>
-                        ) : (
-                            filtered.map(restaurant => {
+                <main className={cn("flex-1", filtered.length === 0 && !isLoading ? "flex flex-col items-center justify-center" : "space-y-4")}>
+                    {isLoading ? (
+                        <p className="text-center text-sm font-bold text-zinc-500 mt-8">Loading restaurants...</p>
+                    ) : filtered.length === 0 ? (
+                        <div className="text-center flex flex-col items-center">
+                            <h2 className={cn(syne.className, "text-2xl font-extrabold tracking-tight text-[#d4d4d8]")}>
+                                {restaurants.length === 0 ? 'no shop listed' : 'no matches found'}
+                            </h2>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3.5">
+                            {filtered.map(restaurant => {
                                 const colors = avatarColor(restaurant.id)
                                 return (
                                     <button
@@ -260,9 +256,9 @@ export default function RestaurantsPage() {
                                         </span>
                                     </button>
                                 )
-                            })
-                        )}
-                    </div>
+                            })}
+                        </div>
+                    )}
                 </main>
             </div>
 
@@ -343,7 +339,7 @@ export default function RestaurantsPage() {
                                                     )}
                                                 </div>
                                                 <div className="text-[10px] font-bold text-zinc-500 truncate">
-                                                    {isActive ? 'Active City' : `${cityCounts[city.name] ?? 0} restaurant${(cityCounts[city.name] ?? 0) === 1 ? '' : 's'}`}
+                                                    {isActive ? 'Active City' : dealsLabel(cityDeals[city.name] ?? 0)}
                                                 </div>
                                             </div>
                                         </button>
@@ -362,7 +358,7 @@ export default function RestaurantsPage() {
                                     <div className="min-w-0 flex-1">
                                         <div className="text-xs font-black text-[#121212] truncate">Use &quot;{normalizedCustomCity}&quot;</div>
                                         <div className="text-[10px] font-bold text-zinc-500 truncate">
-                                            {cityCounts[normalizedCustomCity] ?? 0} restaurant{(cityCounts[normalizedCustomCity] ?? 0) === 1 ? '' : 's'}
+                                            {dealsLabel(cityDeals[normalizedCustomCity] ?? 0)}
                                         </div>
                                     </div>
                                 </button>

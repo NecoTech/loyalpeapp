@@ -212,8 +212,9 @@ export default function ScanPage() {
                     muted
                     playsInline
                 />
-                {/* Fades the feed into white for the controls at the bottom */}
-                <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0)_0%,rgba(255,255,255,0)_55%,rgba(255,255,255,0.8)_75%,rgb(255,255,255)_90%,rgb(255,255,255)_100%)]" />
+                {/* A soft white shading at the very bottom edge, just for readability
+                    — not a full wash over the camera like before. */}
+                <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_top,rgba(255,255,255,0.85)_0%,rgba(255,255,255,0.3)_8%,rgba(255,255,255,0)_18%)]" />
             </div>
             <canvas ref={canvasRef} className="hidden" />
 
@@ -248,8 +249,8 @@ export default function ScanPage() {
                             className={cn(
                                 "flex items-center justify-center w-12 h-12 rounded-full backdrop-blur-md shadow-md border active:scale-95 transition-all",
                                 isFlashOn
-                                    ? "bg-[#fbbf24] text-[#78350f] border-[#f59e0b] scale-[1.08] shadow-[0_0_25px_rgba(251,191,36,0.9),0_0_10px_rgba(245,158,11,0.6)]"
-                                    : "bg-white/70 border-black/10 text-neutral-800 hover:bg-white"
+                                    ? "bg-[#111111] text-white border-[#111111] shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+                                    : "bg-white/80 border-black/10 text-neutral-800 hover:bg-white"
                             )}
                         >
                             <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
@@ -258,7 +259,7 @@ export default function ScanPage() {
                     </div>
 
                     {/* UPI apps */}
-                    <div className="flex flex-col items-center gap-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                    <div className="flex flex-col items-center gap-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                         <div className="flex items-center gap-2">
                             <span className="w-6 h-[1px] bg-neutral-300" />
                             <span className="text-[11px] text-neutral-500 font-medium tracking-wide uppercase">&nbsp;pay with UPI apps&nbsp;</span>

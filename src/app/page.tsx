@@ -20,7 +20,7 @@ import {
     UserRound,
 } from 'lucide-react'
 import { useAuth } from './context/AuthContext'
-import { useLocation, useCityCounts, getCityOptions } from './context/LocationContext'
+import { useLocation, useCityStats, dealsLabel, getCityOptions } from './context/LocationContext'
 import { hasSeenOnboarding } from '../../lib/onboarding'
 import { normalizeCityName } from '../../lib/cities'
 import { cn } from '../../lib/utils'
@@ -71,7 +71,7 @@ export default function Home() {
     const router = useRouter()
     const { user, isInitialized } = useAuth()
     const { selectedCity, setSelectedCity } = useLocation()
-    const cityCounts = useCityCounts()
+    const { counts: cityCounts, deals: cityDeals } = useCityStats()
     // null = not known yet (nothing cached and the first fetch hasn't landed),
     // shown as a placeholder — never as a made-up ₹0.00 or the new-user card.
     const [totalSaved, setTotalSaved] = useState<number | null>(null)
@@ -546,7 +546,7 @@ export default function Home() {
                                                     )}
                                                 </div>
                                                 <div className="text-[10px] font-bold text-[#434656] truncate">
-                                                    {isActive ? 'Active City' : `${cityCounts[city.name] ?? 0} restaurant${(cityCounts[city.name] ?? 0) === 1 ? '' : 's'}`}
+                                                    {isActive ? 'Active City' : dealsLabel(cityDeals[city.name] ?? 0)}
                                                 </div>
                                             </div>
                                         </button>
@@ -565,7 +565,7 @@ export default function Home() {
                                     <div className="min-w-0 flex-1">
                                         <div className="text-xs font-black text-[#111111] truncate">Use &quot;{normalizedCustomCity}&quot;</div>
                                         <div className="text-[10px] font-bold text-[#434656] truncate">
-                                            {cityCounts[normalizedCustomCity] ?? 0} restaurant{(cityCounts[normalizedCustomCity] ?? 0) === 1 ? '' : 's'}
+                                            {dealsLabel(cityDeals[normalizedCustomCity] ?? 0)}
                                         </div>
                                     </div>
                                 </button>

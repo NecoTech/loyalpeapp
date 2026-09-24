@@ -14,7 +14,7 @@ import {
     CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useLocation, useCityCounts, getCityOptions } from '../context/LocationContext'
+import { useLocation, useCityStats, dealsLabel, getCityOptions } from '../context/LocationContext'
 import { hasSeenOnboarding, markOnboardingSeen } from '../../../lib/onboarding'
 import { normalizeCityName } from '../../../lib/cities'
 import { cn } from '../../../lib/utils'
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
     const router = useRouter()
     const { user, isInitialized } = useAuth()
     const { setSelectedCity } = useLocation()
-    const cityCounts = useCityCounts()
+    const { counts: cityCounts, deals: cityDeals } = useCityStats()
 
     const [allowed, setAllowed] = useState(false)
     const [currentSlide, setCurrentSlide] = useState(0)
@@ -445,7 +445,7 @@ export default function OnboardingPage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className={cn(fredoka.className, "px-2 py-0.5 bg-[#FFE066] border border-black rounded-md font-bold text-[11px] text-black")}>
-                                                {cityCounts[city.name] ?? 0} deals
+                                                {dealsLabel(cityDeals[city.name] ?? 0)}
                                             </span>
                                             <ChevronRight size={18} className="text-neutral-400" />
                                         </div>
@@ -471,7 +471,7 @@ export default function OnboardingPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className={cn(fredoka.className, "px-2 py-0.5 bg-[#FFE066] border border-black rounded-md font-bold text-[11px] text-black")}>
-                                            {cityCounts[normalizedCustomCity] ?? 0} deals
+                                            {dealsLabel(cityDeals[normalizedCustomCity] ?? 0)}
                                         </span>
                                         <ChevronRight size={18} className="text-neutral-400" />
                                     </div>

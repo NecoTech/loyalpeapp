@@ -114,7 +114,10 @@ function LoyaltyCardsCarousel({ cards }: { cards: LoyaltyCard[] }) {
                     </span>
                 )}
             </div>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-5 px-5 snap-x snap-mandatory">
+            {/* scroll-px-5 matches the px-5 above: without it, snapping lines a
+                card up with the scroll container's very edge (the screen edge,
+                because of the -mx-5), so the first card stuck to the side. */}
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-5 px-5 scroll-px-5 snap-x snap-mandatory">
                 {orderedCards.map((card, index) => {
                     const theme = CARD_THEMES[index % CARD_THEMES.length]
                     const unlockedCount = card.items.filter(i => i.redeemed).length

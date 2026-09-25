@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { secureFetch } from '../../../lib/secureFetch'
@@ -41,6 +41,7 @@ type PresentedPayment = {
 // restaurant's payment page.
 export default function PaymentRecovery() {
     const pathname = usePathname()
+    const router = useRouter()
     const { user, isInitialized } = useAuth()
 
     // The restaurant-owner dashboard is a separate product surface from the
@@ -177,10 +178,15 @@ export default function PaymentRecovery() {
         }
     }, [isAdminArea, presentUnseenPayment])
 
-    const dismissSuccess = () => {
+    // Done is the only way out of the success screen, and it always ends on
+    // the home page — wherever the payment was confirmed (another page, or
+    // after the app was closed and reopened). Marked as seen first, so the
+    // screen can't come back.
+    const finishSuccess = () => {
         if (presented) clearUnseenPaymentSuccess(presented.payment.referenceId)
         presentingRef.current = null
         setPresented(null)
+        router.push('/')
     }
 
     if (isAdminArea) return null
@@ -218,7 +224,7 @@ export default function PaymentRecovery() {
                         card={cardIndex >= 0 ? cards[cardIndex] : null}
                         cardThemeIndex={Math.max(cardIndex, 0)}
                         newItemId={payment.itemId ?? null}
-                        onClose={dismissSuccess}
+                        onDone={finishSuccess}
                     />
                 )
             })()}

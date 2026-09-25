@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { X, Check, Gift, Star, Sparkles, Cake, BadgeCheck } from 'lucide-react'
+import { Check, Gift, Star, Sparkles, Cake, BadgeCheck } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import RestaurantPhoto from './RestaurantPhoto'
 
@@ -98,14 +98,15 @@ type PaymentSuccessScreenProps = {
     cardThemeIndex: number
     // The reward item this payment just unlocked, highlighted on the card.
     newItemId: string | null
-    onClose: () => void
+    // Called when the customer taps Done — the only way out of this screen.
+    onDone: () => void
 }
 
 // Full-screen "payment verified" celebration. Shared by the payment page and
 // the app-wide recovery watcher, so a payment that's confirmed while the
 // customer is on any page — or after they closed and reopened the app — is
 // shown in exactly the same way.
-export default function PaymentSuccessScreen({ result, restaurant, timestamp, card, cardThemeIndex, newItemId, onClose }: PaymentSuccessScreenProps) {
+export default function PaymentSuccessScreen({ result, restaurant, timestamp, card, cardThemeIndex, newItemId, onDone }: PaymentSuccessScreenProps) {
     const [celebrationKey, setCelebrationKey] = useState(0)
 
     const theme = card ? CARD_THEMES[cardThemeIndex % CARD_THEMES.length] : null
@@ -122,16 +123,9 @@ export default function PaymentSuccessScreen({ result, restaurant, timestamp, ca
             className={cn(plusJakartaSans.className, "fixed inset-0 z-[100] bg-white text-[#111111] antialiased overflow-y-auto flex justify-center")}
         >
             <div className="w-full max-w-[428px] min-h-full flex flex-col relative pb-8">
-                {/* Top Bar */}
-                <header className="flex justify-between items-center w-full px-4 py-3 z-30 sticky top-0 bg-white/90 backdrop-blur-sm">
-                    <button
-                        aria-label="Close"
-                        onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-white border-[3px] border-[#111111] shadow-[3px_3px_0px_#111111] flex items-center justify-center text-[#111111] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-                    >
-                        <X size={20} strokeWidth={2.5} />
-                    </button>
-                </header>
+                {/* No close button: Done (below) is the only way out. This spacer
+                    keeps the rocket from sitting right against the screen's top edge. */}
+                <div className="h-6 shrink-0" aria-hidden="true" />
 
                 {/* Celebration Hero: rocket launch + confetti burst */}
                 <div
@@ -322,7 +316,7 @@ export default function PaymentSuccessScreen({ result, restaurant, timestamp, ca
                     {/* Step 4: Done */}
                     <div className="seq-step-4 w-full mt-5 pb-4">
                         <button
-                            onClick={onClose}
+                            onClick={onDone}
                             className="w-full h-14 bg-[#ccff00] text-[#111111] text-[15px] leading-[18px] tracking-[0.02em] font-extrabold rounded-2xl border-[3px] border-[#111111] shadow-[4px_4px_0px_#111111] flex items-center justify-center gap-2 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
                         >
                             Done

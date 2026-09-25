@@ -5,10 +5,28 @@
 /* Safety net: every page caps its own width (max-w-[428px]/max-w-md etc.) so
    the app reads correctly from small phones up through desktop, but this
    guards against any one element overflowing that on an unusually narrow
-   viewport and forcing the whole page to scroll sideways. */
+   viewport and forcing the whole page to scroll sideways.
+
+   Deliberately NOT set on <html> as well. With overflow-x: hidden on both
+   <html> and <body>, <body> turns into its own scroll container instead of
+   handing its overflow to the page viewport. That breaks position: sticky
+   (every header in the app slides away instead of staying put) and is the
+   classic cause of flaky page scrolling inside an Android WebView. With <html>
+   left alone, the <body> rule is applied to the viewport and both keep
+   working. `clip` (where supported) clips without creating a scroll
+   container at all, so it can never interfere with scrolling. */
 html, body {
   max-width: 100%;
+}
+
+body {
   overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+  body {
+    overflow-x: clip;
+  }
 }
 
 @layer utilities {

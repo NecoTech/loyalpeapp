@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import logoImage from '../../public/logo.png'
 import { Plus_Jakarta_Sans, Syne } from 'next/font/google'
 import {
     MapPin,
@@ -38,6 +39,24 @@ const syne = Syne({ subsets: ['latin'], weight: ['700', '800'] })
 // the cards' left edge. If the logo file is replaced, re-measure the 104.
 const LOGO_HEIGHT_PX = 75
 const LOGO_INK_LEFT_PX = (104 / 353) * LOGO_HEIGHT_PX
+
+// Imported rather than referenced as "/logo.png" so the build gives it a
+// content-hashed URL that browsers cache permanently (a file in public/ is
+// revalidated — and here re-downloaded — on every visit) and that changes by
+// itself when the file is replaced. `priority` makes Next preload it from the
+// server-rendered HTML, so the download starts before any script has run.
+function HomeLogo() {
+    return (
+        <Image
+            src={logoImage}
+            alt="loyalpe"
+            priority
+            fetchPriority="high"
+            className="w-auto"
+            style={{ height: LOGO_HEIGHT_PX, marginLeft: -LOGO_INK_LEFT_PX }}
+        />
+    )
+}
 
 function getInitials(name?: string) {
     if (!name) return null
@@ -245,23 +264,26 @@ export default function Home() {
     const showCustomCityOption = normalizedCustomCity.length >= 2
         && !cityOptions.some(city => city.name.toLowerCase() === normalizedCustomCity.toLowerCase())
 
+    // Until the saved sign-in has loaded the page can't decide what to show
+    // (home, or onboarding for a first-time visitor). Only the logo is drawn in
+    // the meantime, in the header's exact position — it's part of the
+    // server-rendered HTML, so it's on screen at first paint instead of popping
+    // in after the rest of the page.
     if (!readyToRender) {
-        return <div className="min-h-screen bg-white" />
+        return (
+            <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col w-full max-w-[428px] mx-auto relative bg-white")}>
+                <header className="w-full px-4 pt-4 pb-3 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30">
+                    <HomeLogo />
+                </header>
+            </div>
+        )
     }
 
     return (
         <div className={cn(plusJakartaSans.className, "min-h-screen flex flex-col w-full max-w-[428px] mx-auto relative bg-white text-[#1c1b1b] pb-32 selection:bg-[#f6bf22] selection:text-[#1c1b1b]")}>
             {/* Top Navigation App Bar */}
             <header className="w-full px-4 pt-4 pb-3 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30">
-                <Image
-                    src="/logo.png"
-                    alt="loyalpe"
-                    width={176}
-                    height={88}
-                    priority
-                    className="w-auto"
-                    style={{ height: LOGO_HEIGHT_PX, marginLeft: -LOGO_INK_LEFT_PX }}
-                />
+                <HomeLogo />
                 <div className="flex items-center gap-2">
                     <button
                         onClick={openCityModal}
